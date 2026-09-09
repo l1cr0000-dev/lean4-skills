@@ -23,7 +23,9 @@ class PaperArchitectureTest(unittest.TestCase):
         d.mkdir(parents=True)
         (self.root / "FORMALIZATION_SPEC.md").write_text("# Spec\n", encoding="utf-8")
         (self.root / "PAPER.md").write_text("# Paper source\n", encoding="utf-8")
-        source_sha = arch.sha256_text((self.root / "PAPER.md").read_text(encoding="utf-8"))
+        source_sha = arch.sha256_text(
+            (self.root / "PAPER.md").read_text(encoding="utf-8")
+        )
         (self.root / "Paper").mkdir()
         (self.root / "Paper" / "Base.lean").write_text("-- base\n", encoding="utf-8")
         (self.root / "Paper" / "Main.lean").write_text("-- main\n", encoding="utf-8")
@@ -33,7 +35,10 @@ class PaperArchitectureTest(unittest.TestCase):
             "phase": "ticketing",
             "targets": ["P-MAIN"],
             "source": {"path": "PAPER.md", "sha256": source_sha},
-            "context_budget": {"nominal_tokens": 220000, "ticket_target_tokens": 140000},
+            "context_budget": {
+                "nominal_tokens": 220000,
+                "ticket_target_tokens": 140000,
+            },
             "spec": {"path": "FORMALIZATION_SPEC.md", "sha256": "abc123"},
         }
         claims = [
@@ -44,7 +49,11 @@ class PaperArchitectureTest(unittest.TestCase):
                 "uses_assumptions": [],
                 "status": "verified",
                 "source": {"section": "2"},
-                "statement": {"locked": True, "sha256": "base", "lean_file": "Paper/Base.lean"},
+                "statement": {
+                    "locked": True,
+                    "sha256": "base",
+                    "lean_file": "Paper/Base.lean",
+                },
             },
             {
                 "id": "P-MAIN",
@@ -53,7 +62,11 @@ class PaperArchitectureTest(unittest.TestCase):
                 "uses_assumptions": [],
                 "status": "ready",
                 "source": {"section": "5"},
-                "statement": {"locked": True, "sha256": "main", "lean_file": "Paper/Main.lean"},
+                "statement": {
+                    "locked": True,
+                    "sha256": "main",
+                    "lean_file": "Paper/Main.lean",
+                },
             },
         ]
         tickets = []
@@ -70,17 +83,23 @@ class PaperArchitectureTest(unittest.TestCase):
         path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
     def read_json(self, name: str):
-        return json.loads((self.root / ".formalization" / name).read_text(encoding="utf-8"))
+        return json.loads(
+            (self.root / ".formalization" / name).read_text(encoding="utf-8")
+        )
 
     def run_cli(self, *args: str, expect: int = 0) -> tuple[str, str]:
         stdout = io.StringIO()
         stderr = io.StringIO()
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             code = arch.main(["--root", str(self.root), *args])
-        self.assertEqual(code, expect, msg=f"stdout={stdout.getvalue()} stderr={stderr.getvalue()}")
+        self.assertEqual(
+            code, expect, msg=f"stdout={stdout.getvalue()} stderr={stderr.getvalue()}"
+        )
         return stdout.getvalue(), stderr.getvalue()
 
-    def add_ticket(self, ticket_id: str, *, status: str = "ready", claim: str = "P-MAIN") -> None:
+    def add_ticket(
+        self, ticket_id: str, *, status: str = "ready", claim: str = "P-MAIN"
+    ) -> None:
         path = self.root / ".formalization" / "tickets.json"
         tickets = json.loads(path.read_text(encoding="utf-8"))
         tickets.append(
@@ -116,8 +135,21 @@ class PaperArchitectureTest(unittest.TestCase):
         draft: bool = False,
     ) -> None:
         args = [
-            "add-obligation", "--id", oid, "--title", oid, "--kind", kind,
-            "--layer", layer, "--objective", oid, "--risk", "medium", "--hard-unknowns", "1",
+            "add-obligation",
+            "--id",
+            oid,
+            "--title",
+            oid,
+            "--kind",
+            kind,
+            "--layer",
+            layer,
+            "--objective",
+            oid,
+            "--risk",
+            "medium",
+            "--hard-unknowns",
+            "1",
         ]
         if claim:
             args += ["--claim", claim]
@@ -185,8 +217,11 @@ class PaperArchitectureTest(unittest.TestCase):
         claims = {c["id"]: c for c in self.read_json("claims.json")}
         claim = claims[cid]
         args = [
-            "record-dependency-scan", "--claim", cid,
-            "--source-ref", f"paper:{claim.get('source', {}).get('section', cid)}",
+            "record-dependency-scan",
+            "--claim",
+            cid,
+            "--source-ref",
+            f"paper:{claim.get('source', {}).get('section', cid)}",
             "--complete",
         ]
         for dep in claim.get("depends_on", []):
@@ -256,8 +291,14 @@ class PaperArchitectureTest(unittest.TestCase):
         self.ensure_active_coverage()
         self.close_ticket(tid)
         self.run_cli(
-            "satisfy-obligation", oid, "--ticket", tid,
-            "--evidence", f"{oid} elaborates", "--timeout-seconds", "30",
+            "satisfy-obligation",
+            oid,
+            "--ticket",
+            tid,
+            "--evidence",
+            f"{oid} elaborates",
+            "--timeout-seconds",
+            "30",
         )
 
     def test_init_is_additive_and_preserves_base_state(self) -> None:
@@ -289,10 +330,17 @@ class PaperArchitectureTest(unittest.TestCase):
         contract = self.read_json("ticket_contracts.json")["items"][0]
         self.assertEqual(contract["status"], "draft")
 
-    def test_ticket_gate_requires_locked_statement_and_external_obligation(self) -> None:
+    def test_ticket_gate_requires_locked_statement_and_external_obligation(
+        self,
+    ) -> None:
         self.add_ticket("T-BASE")
         self.add_ticket("T-MAIN")
-        self.add_obligation("O-BASE", claim="P-BASE", owned="Paper/Base.lean", accept="python3 -c \"print('accept-ok')\"")
+        self.add_obligation(
+            "O-BASE",
+            claim="P-BASE",
+            owned="Paper/Base.lean",
+            accept="python3 -c \"print('accept-ok')\"",
+        )
         self.add_obligation("O-MAIN", dep="O-BASE")
         self.bind("T-BASE", ["O-BASE"], completes=["O-BASE"], locked_claim="P-BASE")
         self.bind("T-MAIN", ["O-MAIN"], completes=["O-MAIN"])
@@ -315,13 +363,22 @@ class PaperArchitectureTest(unittest.TestCase):
         self.assertIn("Paper/Main.lean", packet["contract"]["owned_files"])
         self.assertEqual(packet["claims"][0]["statement"]["sha256"], "main")
 
-    def test_satisfy_obligation_requires_closed_contracted_ticket_and_writes_evidence(self) -> None:
+    def test_satisfy_obligation_requires_closed_contracted_ticket_and_writes_evidence(
+        self,
+    ) -> None:
         self.add_ticket("T-1")
         self.add_obligation("O-A")
         self.bind("T-1", ["O-A"], completes=["O-A"])
         self.run_cli(
-            "satisfy-obligation", "O-A", "--ticket", "T-1", "--verification", "passed",
-            "--evidence", "proof elaborates", expect=2,
+            "satisfy-obligation",
+            "O-A",
+            "--ticket",
+            "T-1",
+            "--verification",
+            "passed",
+            "--evidence",
+            "proof elaborates",
+            expect=2,
         )
         self.satisfy("O-A", "T-1")
         item = self.read_json("obligations.json")["items"][0]
@@ -345,7 +402,9 @@ class PaperArchitectureTest(unittest.TestCase):
         self.assertTrue(any("T-A" in b and "T-C" in b for b in batches))
         self.assertFalse(any("T-A" in b and "T-B" in b for b in batches))
 
-    def test_audit_requires_claim_coverage_and_transitive_generic_obligations(self) -> None:
+    def test_audit_requires_claim_coverage_and_transitive_generic_obligations(
+        self,
+    ) -> None:
         # With targets but no obligation mapping, architecture is incomplete.
         out, _ = self.run_cli("architecture-audit", "--format", "json")
         audit = json.loads(out)
@@ -354,7 +413,12 @@ class PaperArchitectureTest(unittest.TestCase):
 
         self.add_ticket("T-G", claim="P-BASE")
         self.add_ticket("T-M")
-        self.add_obligation("O-G", claim="P-BASE", owned="Paper/Generic.lean", accept="python3 -c \"print('accept-ok')\"")
+        self.add_obligation(
+            "O-G",
+            claim="P-BASE",
+            owned="Paper/Generic.lean",
+            accept="python3 -c \"print('accept-ok')\"",
+        )
         self.add_obligation("O-M", claim="P-MAIN", dep="O-G")
         self.bind("T-G", ["O-G"], completes=["O-G"], locked_claim="P-BASE")
         self.bind("T-M", ["O-M"], completes=["O-M"])
@@ -367,12 +431,16 @@ class PaperArchitectureTest(unittest.TestCase):
         self.assertTrue(audit["complete"])
         self.assertEqual(audit["related_obligations"], ["O-G", "O-M"])
 
-    def test_full_paper_promotion_is_blocked_until_main_theorem_gate_passes(self) -> None:
+    def test_full_paper_promotion_is_blocked_until_main_theorem_gate_passes(
+        self,
+    ) -> None:
         self.add_extra_claim()
         self.run_cli(
             "configure-verification",
-            "--primary-target", "P-MAIN",
-            "--full-paper-policy", "after-main",
+            "--primary-target",
+            "P-MAIN",
+            "--full-paper-policy",
+            "after-main",
             "--full-all-claims",
         )
         self.run_cli("promote-full-paper", "--all-claims", expect=2)
@@ -384,8 +452,10 @@ class PaperArchitectureTest(unittest.TestCase):
         self.add_extra_claim()
         self.run_cli(
             "configure-verification",
-            "--primary-target", "P-MAIN",
-            "--full-paper-policy", "after-main",
+            "--primary-target",
+            "P-MAIN",
+            "--full-paper-policy",
+            "after-main",
             "--full-all-claims",
         )
 
@@ -439,17 +509,20 @@ class PaperArchitectureTest(unittest.TestCase):
         self.assertIn("P-EXTRA", full_gate["base_audit"]["unverified_claims"])
         self.assertTrue(json.loads(self.run_cli("check-ticket", "T-X")[0])["ready"])
 
-
     def test_main_theorem_only_policy_is_a_terminal_valid_scope(self) -> None:
         self.run_cli(
             "configure-verification",
-            "--primary-target", "P-MAIN",
-            "--full-paper-policy", "skip",
+            "--primary-target",
+            "P-MAIN",
+            "--full-paper-policy",
+            "skip",
         )
         self.add_ticket("T-B", claim="P-BASE")
         self.add_ticket("T-M")
         self.add_obligation(
-            "O-B", claim="P-BASE", owned="Paper/Base.lean",
+            "O-B",
+            claim="P-BASE",
+            owned="Paper/Base.lean",
             accept="python3 -c \"print('accept-ok')\"",
         )
         self.add_obligation("O-M", claim="P-MAIN", dep="O-B")
@@ -469,18 +542,24 @@ class PaperArchitectureTest(unittest.TestCase):
         self.assertEqual(gate["next_action"], "complete-selected-scope")
         self.run_cli("promote-full-paper", "--all-claims", expect=2)
 
-    def test_full_paper_policy_can_be_enabled_later_without_redoing_stage_one(self) -> None:
+    def test_full_paper_policy_can_be_enabled_later_without_redoing_stage_one(
+        self,
+    ) -> None:
         self.add_extra_claim()
         self.run_cli(
             "configure-verification",
-            "--primary-target", "P-MAIN",
-            "--full-paper-policy", "skip",
+            "--primary-target",
+            "P-MAIN",
+            "--full-paper-policy",
+            "skip",
             "--full-all-claims",
         )
         self.add_ticket("T-B", claim="P-BASE")
         self.add_ticket("T-M")
         self.add_obligation(
-            "O-B", claim="P-BASE", owned="Paper/Base.lean",
+            "O-B",
+            claim="P-BASE",
+            owned="Paper/Base.lean",
             accept="python3 -c \"print('accept-ok')\"",
         )
         self.add_obligation("O-M", claim="P-MAIN", dep="O-B")
@@ -547,7 +626,12 @@ class PaperArchitectureTest(unittest.TestCase):
         # Cover and satisfy both claims first.
         self.add_ticket("T-B", claim="P-BASE")
         self.add_ticket("T-M")
-        self.add_obligation("O-B", claim="P-BASE", owned="Paper/Base.lean", accept="python3 -c \"print('accept-ok')\"")
+        self.add_obligation(
+            "O-B",
+            claim="P-BASE",
+            owned="Paper/Base.lean",
+            accept="python3 -c \"print('accept-ok')\"",
+        )
         self.add_obligation("O-M", claim="P-MAIN", dep="O-B")
         self.bind("T-B", ["O-B"], completes=["O-B"], locked_claim="P-BASE")
         self.bind("T-M", ["O-M"], completes=["O-M"])
@@ -556,28 +640,46 @@ class PaperArchitectureTest(unittest.TestCase):
         self.record_coverage("P-BASE")
         self.record_coverage("P-MAIN")
         self.run_cli(
-            "add-comparator", "--id", "CMP-MAIN", "--target-claim", "P-MAIN",
-            "--reference-source", "independent/reference.lean",
-            "--reference-declaration", "Reference.main",
-            "--solution-declaration", "Paper.main",
-            "--check-command", "python3 -c \"print('accept-ok')\"", "--required",
+            "add-comparator",
+            "--id",
+            "CMP-MAIN",
+            "--target-claim",
+            "P-MAIN",
+            "--reference-source",
+            "independent/reference.lean",
+            "--reference-declaration",
+            "Reference.main",
+            "--solution-declaration",
+            "Paper.main",
+            "--check-command",
+            "python3 -c \"print('accept-ok')\"",
+            "--required",
         )
         out, _ = self.run_cli("architecture-audit", "--format", "json")
         self.assertEqual(json.loads(out)["unverified_comparators"], ["CMP-MAIN"])
         self.mark_claim_verified("P-MAIN")
         self.run_cli(
-            "verify-comparator", "CMP-MAIN",
-            "--evidence", "Comparator elaborated", "--timeout-seconds", "30",
+            "verify-comparator",
+            "CMP-MAIN",
+            "--evidence",
+            "Comparator elaborated",
+            "--timeout-seconds",
+            "30",
         )
         out, _ = self.run_cli("architecture-audit", "--format", "json")
         self.assertTrue(json.loads(out)["complete"])
 
-
-    def test_mixed_stage_ticket_is_rejected_even_if_one_obligation_is_active(self) -> None:
+    def test_mixed_stage_ticket_is_rejected_even_if_one_obligation_is_active(
+        self,
+    ) -> None:
         self.add_extra_claim()
         self.run_cli(
-            "configure-verification", "--primary-target", "P-MAIN",
-            "--full-paper-policy", "after-main", "--full-all-claims",
+            "configure-verification",
+            "--primary-target",
+            "P-MAIN",
+            "--full-paper-policy",
+            "after-main",
+            "--full-all-claims",
         )
         self.add_ticket("T-MIX")
         self.add_obligation("O-IN", claim="P-MAIN")
@@ -589,17 +691,22 @@ class PaperArchitectureTest(unittest.TestCase):
 
     def test_machine_verification_failure_cannot_satisfy_obligation(self) -> None:
         self.add_ticket("T-FAIL")
-        self.add_obligation(
-            "O-FAIL", accept="python3 -c \"import sys; sys.exit(7)\""
-        )
+        self.add_obligation("O-FAIL", accept='python3 -c "import sys; sys.exit(7)"')
         self.bind("T-FAIL", ["O-FAIL"], completes=["O-FAIL"])
         self.ensure_active_coverage()
         self.close_ticket("T-FAIL")
         self.run_cli(
-            "satisfy-obligation", "O-FAIL", "--ticket", "T-FAIL",
-            "--timeout-seconds", "30", expect=2,
+            "satisfy-obligation",
+            "O-FAIL",
+            "--ticket",
+            "T-FAIL",
+            "--timeout-seconds",
+            "30",
+            expect=2,
         )
-        status = {x["id"]: x["status"] for x in self.read_json("obligations.json")["items"]}
+        status = {
+            x["id"]: x["status"] for x in self.read_json("obligations.json")["items"]
+        }
         self.assertEqual(status["O-FAIL"], "ready")
 
     def test_tampered_evidence_invalidates_validation(self) -> None:
@@ -607,7 +714,9 @@ class PaperArchitectureTest(unittest.TestCase):
         self.add_obligation("O-E")
         self.bind("T-E", ["O-E"], completes=["O-E"])
         self.satisfy("O-E", "T-E")
-        obligation = {x["id"]: x for x in self.read_json("obligations.json")["items"]}["O-E"]
+        obligation = {x["id"]: x for x in self.read_json("obligations.json")["items"]}[
+            "O-E"
+        ]
         evidence_path = self.root / obligation["evidence"]["path"]
         evidence_path.write_text("{}\n", encoding="utf-8")
         self.run_cli("validate", expect=2)
@@ -619,27 +728,37 @@ class PaperArchitectureTest(unittest.TestCase):
         out, _ = self.run_cli("check-ticket", "T-B", expect=2)
         payload = json.loads(out)
         self.assertFalse(payload["ready"])
-        self.assertTrue(any("dependency coverage audit is incomplete" in r for r in payload["reasons"]))
+        self.assertTrue(
+            any(
+                "dependency coverage audit is incomplete" in r
+                for r in payload["reasons"]
+            )
+        )
         audit = arch.dependency_coverage_audit(arch.Store(self.root), ["P-MAIN"])
         self.assertFalse(audit["complete"])
         self.assertEqual(set(audit["missing_scans"]), {"P-BASE", "P-MAIN"})
-
 
     def test_source_change_stales_dependency_coverage(self) -> None:
         self.record_coverage("P-BASE")
         (self.root / "PAPER.md").write_text("# changed paper\n", encoding="utf-8")
         project = self.read_json("project.json")
-        project["source"]["sha256"] = arch.sha256_text((self.root / "PAPER.md").read_text(encoding="utf-8"))
+        project["source"]["sha256"] = arch.sha256_text(
+            (self.root / "PAPER.md").read_text(encoding="utf-8")
+        )
         self.write_json(self.root / ".formalization" / "project.json", project)
         audit = arch.dependency_coverage_audit(arch.Store(self.root), ["P-BASE"])
         self.assertFalse(audit["complete"])
         self.assertEqual(audit["stale_scans"], ["P-BASE"])
 
     def test_trust_level_reports_conditional_external_assumptions(self) -> None:
-        assumptions = [{
-            "id": "A-EXT", "category": "trusted_external", "approved": True,
-            "title": "External theorem",
-        }]
+        assumptions = [
+            {
+                "id": "A-EXT",
+                "category": "trusted_external",
+                "approved": True,
+                "title": "External theorem",
+            }
+        ]
         self.write_json(self.root / ".formalization" / "assumptions.json", assumptions)
         claims = self.read_json("claims.json")
         for claim in claims:
@@ -649,15 +768,22 @@ class PaperArchitectureTest(unittest.TestCase):
         trust = arch.trust_level_for_targets(arch.Store(self.root), ["P-MAIN"])
         self.assertEqual(trust["level"], "CONDITIONAL_TRUSTED_EXTERNAL")
 
-
-
     def test_research_contract_cannot_complete_formal_obligation(self) -> None:
         self.add_ticket("T-R")
         self.add_obligation("O-R")
         self.run_cli(
-            "bind-ticket", "T-R", "--obligation", "O-R",
-            "--completes-obligation", "O-R", "--worker", "research",
-            "--owned-file", "Paper/Main.lean", "--approved", expect=2,
+            "bind-ticket",
+            "T-R",
+            "--obligation",
+            "O-R",
+            "--completes-obligation",
+            "O-R",
+            "--worker",
+            "research",
+            "--owned-file",
+            "Paper/Main.lean",
+            "--approved",
+            expect=2,
         )
 
     def test_pending_scope_transaction_is_rolled_back_on_next_command(self) -> None:
@@ -670,47 +796,61 @@ class PaperArchitectureTest(unittest.TestCase):
             "old_project": old_project,
             "old_scope": old_scope,
         }
-        self.write_json(self.root / ".formalization" / "architecture_transaction.json", journal)
+        self.write_json(
+            self.root / ".formalization" / "architecture_transaction.json", journal
+        )
         broken_project = dict(old_project)
         broken_project["targets"] = ["P-BASE"]
         self.write_json(self.root / ".formalization" / "project.json", broken_project)
         broken_scope = dict(old_scope)
         broken_scope["primary_targets"] = ["P-BASE"]
-        self.write_json(self.root / ".formalization" / "verification_scope.json", broken_scope)
+        self.write_json(
+            self.root / ".formalization" / "verification_scope.json", broken_scope
+        )
         self.run_cli("status")
         self.assertEqual(self.read_json("project.json"), old_project)
         self.assertEqual(self.read_json("verification_scope.json"), old_scope)
-        self.assertFalse((self.root / ".formalization" / "architecture_transaction.json").exists())
-
-
+        self.assertFalse(
+            (self.root / ".formalization" / "architecture_transaction.json").exists()
+        )
 
     def test_source_change_invalidates_machine_ticket_evidence(self) -> None:
         self.add_ticket("T-SRC")
         self.add_obligation("O-SRC")
         self.bind("T-SRC", ["O-SRC"], completes=["O-SRC"])
         self.satisfy("O-SRC", "T-SRC")
-        (self.root / "Paper" / "Main.lean").write_text("-- changed after verify\n", encoding="utf-8")
+        (self.root / "Paper" / "Main.lean").write_text(
+            "-- changed after verify\n", encoding="utf-8"
+        )
         self.run_cli("validate", expect=2)
 
     def test_explicit_full_paper_strategy_does_not_fake_main_gate_pass(self) -> None:
         self.run_cli(
-            "configure-verification", "--strategy", "full-paper",
-            "--primary-target", "P-MAIN", "--full-all-claims",
+            "configure-verification",
+            "--strategy",
+            "full-paper",
+            "--primary-target",
+            "P-MAIN",
+            "--full-all-claims",
         )
         scope = self.read_json("verification_scope.json")
         self.assertEqual(scope["stage"], "full-paper")
-        self.assertEqual(scope["main_theorem_gate"]["status"], "explicit-full-paper-bypass")
+        self.assertEqual(
+            scope["main_theorem_gate"]["status"], "explicit-full-paper-bypass"
+        )
         self.assertNotEqual(scope["main_theorem_gate"]["status"], "passed")
-
-
 
     def test_unrecorded_paper_source_change_blocks_dependency_coverage(self) -> None:
         self.record_coverage("P-BASE")
-        (self.root / "PAPER.md").write_text("# silently changed paper\n", encoding="utf-8")
+        (self.root / "PAPER.md").write_text(
+            "# silently changed paper\n", encoding="utf-8"
+        )
         audit = arch.dependency_coverage_audit(arch.Store(self.root), ["P-BASE"])
         self.assertFalse(audit["complete"])
         self.assertFalse(audit["source_integrity"]["ok"])
-        self.assertEqual(audit["source_integrity"]["error"], "paper source fingerprint mismatch")
+        self.assertEqual(
+            audit["source_integrity"]["error"], "paper source fingerprint mismatch"
+        )
 
     def test_init_auto_freezes_missing_paper_source_fingerprint(self) -> None:
         project = self.read_json("project.json")
