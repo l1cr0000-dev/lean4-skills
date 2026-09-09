@@ -513,9 +513,9 @@ Constructing T_counterexample : ∃ n : Nat, ¬ (n < 10) := ⟨10, by decide⟩
 Gate-only T_counterexample_negates_target : ¬ (∀ n : Nat, n < 10) :=
   not_forall.mpr T_counterexample
 Appended to Bad.lean.
-Compile gate (lake env lean Bad.lean): passed.
-Axiom gate (T_counterexample_negates_target): ⊆ {propext, Classical.choice, Quot.sound} — passed.
-Dropped gate-only wrapper; committing T_counterexample (re-checked: passed).
+Compile gate (lake lean Bad.lean — imports built, then this file elaborated): passed.
+Axiom gate (#print axioms T_counterexample_negates_target, read from the same lake lean run): ⊆ {propext, Classical.choice, Quot.sound} — passed.
+Dropped gate-only blocks (axiom probe + wrapper); committing T_counterexample (re-checked with lake lean Bad.lean: passed).
 
 Commit this change? [yes / no]
 > yes
@@ -711,9 +711,9 @@ Constructing T_counterexample : ∃ n : Nat, ¬ Nat.Prime (n^2 + n + 41) :=
 Gate-only T_counterexample_negates_target : ¬ (∀ n : Nat, Nat.Prime (n^2 + n + 41)) :=
   not_forall.mpr T_counterexample
 Appended to Conjecture.lean.
-Compile gate: passed.
-Axiom gate (T_counterexample_negates_target): ⊆ {propext, Classical.choice, Quot.sound} — passed.
-Dropped gate-only wrapper; committing T_counterexample (re-checked: passed).
+Compile gate (lake lean Conjecture.lean — imports built, then this file elaborated): passed.
+Axiom gate (#print axioms T_counterexample_negates_target, read from the same lake lean run): ⊆ {propext, Classical.choice, Quot.sound} — passed.
+Dropped gate-only blocks (axiom probe + wrapper); committing T_counterexample (re-checked with lake lean Conjecture.lean: passed).
 
 Commit this change? [yes / no]
 > yes
@@ -1018,14 +1018,14 @@ Claude: No progress on Core.lean:89 after 3 attempts. Running stuck review...
 
 **Top 3 blockers:**
 1. Missing lemma for tendsto_atTop → search Mathlib.Topology.Order
-2. Need MeasurableSpace instance → add `haveI` before apply
+2. Need MeasurableSpace instance → supply the intended structure before apply — `have : MeasurableSpace β := borel β` only when `[TopologicalSpace β]` is available and the Borel σ-algebra is the intended one; otherwise import the declaring module or report the missing prerequisite — not `:= inferInstance`, which re-runs the failed search
 3. Goal has implicit coercion issue → try `convert` instead of `exact`
 
 **Recommended:** Search tendsto variants first.
 
 Review complete. Proposed plan:
 1. Search Mathlib.Topology.Order for tendsto_atTop variants
-2. Add `haveI : MeasurableSpace β := inferInstance` before apply
+2. Add `have : MeasurableSpace β := borel β` before apply — valid because `β` carries a topology here and Borel is the intended σ-algebra (otherwise import the declaring module or report the missing prerequisite)
 3. If exact fails, try `convert` with explicit type annotation
 
 Proceed with this plan? [yes / no / skip]
@@ -1127,18 +1127,32 @@ Use the lightest tool that answers the question:
 | File compile | `lake env lean <path/to/File.lean>` | File-level gate, import checks | Seconds |
 | Project gate | `lake build` | Checkpoint, final gate, `/lean4:checkpoint` | Minutes |
 
-Run `lake env lean` from the Lean project root; pass repo-relative file paths.
+Run `lake env lean` from the Lean project root; pass repo-relative file paths. The file gate checks against the built `.olean`s of the file's imports and does not rebuild them — after editing an imported module, run `lake lean <path/to/File.lean>` (dependency-aware: builds the imports, then elaborates the file) before trusting it ([cycle-engine: File Gate Scope](cycle-engine.md#file-gate-scope)).
 
-### Anti-Pattern: `lake build` with File Arguments
+### Target Spellings: `lake build`, `lake lean`, `lake env lean`
 
 ```
-# ✗ Wrong — lake build does not accept file path arguments
-lake build InfinitaryLogic/Scott/Sentence.lean
-→ error: unknown target 'InfinitaryLogic/Scott/Sentence.lean'
+# ✗ Wrong — the bare basename of a nested file does not resolve under the lib's srcDir
+lake build Sentence.lean
+→ error: unknown target `Sentence.lean`
 
-# ✓ Correct — use lake env lean for single-file compilation
+# ✗ Wrong — never derive a module name by turning / into . (breaks on custom srcDir)
+lake build src.InfinitaryLogic.Scott.Sentence
+→ error: unknown target `src.InfinitaryLogic.Scott.Sentence`
+
+# ✓ Dependency-aware file gate: builds the file's imports, then runs Lean on this
+#   exact file. Works for any .lean file in the workspace, module or scratch.
+lake lean InfinitaryLogic/Scott/Sentence.lean
+
+# ✓ Optional module build: source path under the lib's srcDir (current Lake resolves
+#   the module via the workspace config; writes the module's artifacts)
+lake build InfinitaryLogic/Scott/Sentence.lean
+
+# ✓ Same, with the module name — only when known from Lake config
+lake build +InfinitaryLogic.Scott.Sentence
+
+# ✓ Fast pre-screen against the already-built imports only
 lake env lean InfinitaryLogic/Scott/Sentence.lean
-→ (compiles single file with lake environment)
 ```
 
 ### Typical Verification Flow
@@ -1147,7 +1161,7 @@ lake env lean InfinitaryLogic/Scott/Sentence.lean
 1. Edit proof
 2. lean_diagnostic_messages(file)    # immediate feedback
 3. Fix any issues
-4. lake env lean path/to/File.lean   # file-level gate (from project root)
+4. lake env lean path/to/File.lean   # file-level gate (from project root; built imports only)
 5. Continue editing...
 6. lake build                        # project gate at checkpoint only
 ```

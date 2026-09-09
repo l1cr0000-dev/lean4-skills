@@ -346,7 +346,7 @@ A proof is complete when:
 - Only standard axioms (`propext`, `Classical.choice`, `Quot.sound`)
 - No statement changes without permission
 
-Verification ladder: `lean_diagnostic_messages(file)` per-edit → `lake env lean <path/to/File.lean>` file gate (run from project root) → `lake build` project gate only. See [cycle-engine: Build Target Policy](references/cycle-engine.md#build-target-policy).
+Verification ladder: `lean_diagnostic_messages(file)` per-edit → `lake env lean <path/to/File.lean>` file gate (run from project root; checks against built imports only — after a cross-file edit use `lake lean <path/to/File.lean>`, see [File Gate Scope](references/cycle-engine.md#file-gate-scope)) → `lake build` project gate only. See [cycle-engine: Build Target Policy](references/cycle-engine.md#build-target-policy).
 
 ## Common Fixes
 
@@ -355,13 +355,16 @@ See [compilation-errors](references/compilation-errors.md) for error-by-error gu
 ## Type Class Patterns
 
 ```lean
--- Local instance for this proof block
-haveI : MeasurableSpace Ω := inferInstance
-letI : Fintype α := ⟨...⟩
+-- Local instance for this proof block: plain `have`/`let` already register a
+-- class-typed local for synthesis in Lean 4
+have : MeasurableSpace Ω := inferInstance
+let inst : Fintype α := ⟨...⟩   -- `let` when the VALUE must stay visible (data)
 
 -- Scoped instances (affects current section)
 open scoped Topology MeasureTheory
 ```
+
+**`haveI` / `letI` rule (Lean 4):** `have` and `let` register local instances themselves; `haveI`/`letI` differ only by *inlining* the value into the term. In a tactic proof of a proposition that inlining can have no effect (proof irrelevance), so `haveI`/`letI` are never needed there — Mathlib's [`haveI`/`letI` linter](https://leanprover-community.github.io/mathlib4_docs/Mathlib/Tactic/Linter/HaveILetI.html) flags them. Reserve `letI` for definitions where the instance value must be inlined into data. Before adding any local instance, check whether synthesis already succeeds (many "provide the instance" idioms predate the corresponding Mathlib instance).
 
 Order matters: provide outer structures before inner ones.
 
@@ -412,7 +415,7 @@ lean4-skills-sorry-analyzer . --report-only
 - Use the project's cache command: `lake cache get` on newer Lake, or `lake exe cache get` where the project still uses the mathlib cache executable.
 - If Lean LSP is cold or timing out on first use, run one `lake build` to bootstrap the workspace.
 - After bootstrap, return to the normal verification ladder:
-  `lean_diagnostic_messages(file)` → `lake env lean <path/to/File.lean>` (from project root) → `lake build` only at checkpoint/final gate.
+  `lean_diagnostic_messages(file)` → `lake env lean <path/to/File.lean>` (from project root; built imports only, see [File Gate Scope](references/cycle-engine.md#file-gate-scope)) → `lake build` only at checkpoint/final gate.
 - Do **not** symlink another worktree's `.lake/build`; use Lake cache/artifact mechanisms instead.
 
 ## References
