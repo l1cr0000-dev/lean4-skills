@@ -25,7 +25,7 @@ Gemini CLI、Cursor 等不同宿主；差异主要在命令入口和运行时集
 | 宿主 | 推荐安装方式 | 获得的能力 |
 |---|---|---|
 | Claude Code | 原生插件 | Skill、`/lean4:*` 命令、hooks、护栏与辅助运行时 |
-| Codex | 原生插件 | Skill、受信任 hooks 与绝对路径辅助运行时 |
+| Codex | 原生插件 | 完整 Lean 运行时，以及可选的友好论文 skill adapter |
 | 其他 Agent Skill 宿主 | 仅安装 skill | 指令与参考文档 |
 | 任意宿主 | Portable checkout | 完整辅助运行时 |
 
@@ -41,6 +41,7 @@ Codex 终端中执行：
 ```bash
 codex plugin marketplace add l1cr0000-dev/lean4-skills --ref main
 codex plugin add lean4@lean4-skills
+codex plugin add lean4-codex@lean4-skills
 ```
 
 完整的宿主安装说明见 [INSTALLATION.md](INSTALLATION.md)。如果你只需要上游

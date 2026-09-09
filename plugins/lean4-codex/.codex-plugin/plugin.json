@@ -1,0 +1,38 @@
+{
+  "name": "lean4-codex",
+  "version": "0.1.0",
+  "description": "Native Codex skills for Lean 4 theorem proving and paper-scale formalization.",
+  "author": {
+    "name": "l1cr0000-dev",
+    "url": "https://github.com/l1cr0000-dev"
+  },
+  "homepage": "https://github.com/l1cr0000-dev/lean4-skills",
+  "repository": "https://github.com/l1cr0000-dev/lean4-skills",
+  "license": "MIT",
+  "keywords": [
+    "lean4",
+    "mathlib",
+    "formalization",
+    "paper-workflow",
+    "codex"
+  ],
+  "skills": "./skills",
+  "interface": {
+    "displayName": "Lean 4 Paper Workflows",
+    "shortDescription": "Native Lean 4 and paper workflows for Codex.",
+    "longDescription": "A thin Codex adapter exposing friendly Lean 4 and paper-scale skills while delegating all state, architecture, and proof work to the canonical lean4-skills runtime.",
+    "developerName": "l1cr0000-dev",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read",
+      "Write",
+      "Shell"
+    ],
+    "websiteURL": "https://github.com/l1cr0000-dev/lean4-skills",
+    "defaultPrompt": [
+      "Use $paper-status to report the durable paper formalization state.",
+      "Use $paper-frontier to find safe paper tickets to implement.",
+      "Use $lean4 for a validated Lean 4 theorem workflow."
+    ]
+  }
+}

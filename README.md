@@ -31,7 +31,7 @@ Fork-specific work and issues belong in
 | Host | Recommended installation | What you get | Details |
 |---|---|---|---|
 | Claude Code | Native plugin (Tier 3) | Skill + `/lean4:*` commands, hooks, guardrails, subagents, helper runtime | [Claude Code](INSTALLATION.md#claude-code-native-plugin) |
-| Codex | Native plugin (Tier 3) | Skill + trusted hooks + absolute-path helper runtime; no `/lean4:*` parity | [Codex](INSTALLATION.md#openai-codex-cli) |
+| Codex | Native plugins (Tier 3) | Full Lean runtime plus optional friendly paper-skill adapter | [Codex](INSTALLATION.md#openai-codex-cli) |
 | Other Agent Skills hosts (Gemini, Antigravity, Copilot, Cursor, Windsurf, OpenCode, …) | Skill-only quick install | Instructions + references (documented, not CI-verified) | [Installation guide](INSTALLATION.md) |
 | Any host, full runtime | Portable checkout (Tier 2) | Skill + wrappers + helper scripts | [Portable](INSTALLATION.md#portable-checkout--helper-runtime-all-hosts) |
 
@@ -47,6 +47,7 @@ Fork-specific work and issues belong in
 ```bash
 codex plugin marketplace add l1cr0000-dev/lean4-skills --ref main
 codex plugin add lean4@lean4-skills
+codex plugin add lean4-codex@lean4-skills
 ```
 
 > Host-native skill installers generally provide the instructions and

@@ -240,6 +240,24 @@ specialized or hosted execution path, so this hook is not a security or
 enforcement boundary. The plugin also does not register Claude Code's
 `/lean4:*` slash commands; invoke `$lean4` and ask for the named workflow.
 
+### Native paper adapter (friendly skill names)
+
+Install the separate, skill-only adapter when paper workflows should appear as
+`$paper-grill`, `$paper-to-spec`, `$paper-to-tickets`, `$paper-frontier`,
+`$paper-implement`, `$paper-handoff`, `$paper-status`, `$paper-review`,
+`$paper-sync`, and `$paper-final-audit` instead of migrated
+`source-command-*` names:
+
+```bash
+codex plugin add lean4-codex@lean4-skills
+```
+
+The adapter has no `commands/`, hooks, wrappers, or copied proof/runtime files.
+It delegates to the canonical checkout paths, including
+`python3 plugins/lean4/lib/paper_architecture.py ...`; keep the canonical
+`plugins/lean4` runtime available when using these skills. Install the full
+`lean4` plugin as well when theorem-level helpers and native hooks are needed.
+
 #### Verify
 
 ```bash
@@ -265,6 +283,7 @@ The preflight must succeed even when `LEAN4_*` are unset and the plugin's
 ```bash
 codex plugin marketplace upgrade lean4-skills
 codex plugin add lean4@lean4-skills
+codex plugin add lean4-codex@lean4-skills
 ```
 
 Review the new hook hash after an update, then start a new task. To remove the
@@ -272,6 +291,7 @@ plugin:
 
 ```bash
 codex plugin remove lean4@lean4-skills
+codex plugin remove lean4-codex@lean4-skills
 ```
 
 ### Core skill only (Tier 1 fallback)

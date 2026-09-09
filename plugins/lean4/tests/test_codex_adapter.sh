@@ -17,6 +17,7 @@ REPO_ROOT="$(cd "$PLUGIN_ROOT/../.." && pwd)"
 
 CODEX_MANIFEST="$PLUGIN_ROOT/.codex-plugin/plugin.json"
 CLAUDE_MANIFEST="$PLUGIN_ROOT/.claude-plugin/plugin.json"
+PAPER_ADAPTER_MANIFEST="$REPO_ROOT/plugins/lean4-codex/.codex-plugin/plugin.json"
 CODEX_HOOKS="$PLUGIN_ROOT/hooks/codex-hooks.json"
 CODEX_MARKETPLACE="$REPO_ROOT/.agents/plugins/marketplace.json"
 BOOTSTRAP="$PLUGIN_ROOT/hooks/bootstrap.sh"
@@ -37,15 +38,16 @@ echo ""
 # ---------------------------------------------------------------------------
 # Metadata contracts: in-place plugin, thin marketplace, dedicated hooks.
 # ---------------------------------------------------------------------------
-if python3 - "$CODEX_MANIFEST" "$CLAUDE_MANIFEST" "$CODEX_MARKETPLACE" "$CODEX_HOOKS" <<'PY'
+if python3 - "$CODEX_MANIFEST" "$CLAUDE_MANIFEST" "$PAPER_ADAPTER_MANIFEST" "$CODEX_MARKETPLACE" "$CODEX_HOOKS" <<'PY'
 import json
 import re
 import sys
 from pathlib import Path
 
-codex_path, claude_path, market_path, hooks_path = map(Path, sys.argv[1:])
+codex_path, claude_path, adapter_path, market_path, hooks_path = map(Path, sys.argv[1:])
 codex = json.loads(codex_path.read_text())
 claude = json.loads(claude_path.read_text())
+adapter = json.loads(adapter_path.read_text())
 market = json.loads(market_path.read_text())
 hooks = json.loads(hooks_path.read_text())
 
@@ -73,8 +75,8 @@ assert "termsOfServiceURL" not in interface
 
 assert market["name"] == "lean4-skills"
 assert market["interface"]["displayName"] == "Lean 4 Skills"
-assert len(market["plugins"]) == 1
-entry = market["plugins"][0]
+assert len(market["plugins"]) == 2
+entry = next(item for item in market["plugins"] if item["name"] == "lean4")
 assert entry["name"] == "lean4"
 assert entry["source"] == {"source": "local", "path": "./plugins/lean4"}
 assert entry["policy"] == {
@@ -82,6 +84,56 @@ assert entry["policy"] == {
     "authentication": "ON_INSTALL",
 }
 assert entry["category"] == "Coding"
+adapter_entry = next(
+    item for item in market["plugins"] if item["name"] == "lean4-codex"
+)
+assert adapter["name"] == "lean4-codex"
+assert adapter["skills"] == "./skills"
+assert adapter_entry["source"] == {
+    "source": "local",
+    "path": "./plugins/lean4-codex",
+}
+assert adapter_entry["policy"] == {
+    "installation": "AVAILABLE",
+    "authentication": "ON_INSTALL",
+}
+assert adapter_entry["category"] == "Productivity"
+
+adapter_root = adapter_path.parent.parent
+expected_skills = {
+    "lean4",
+    "paper-grill",
+    "paper-to-spec",
+    "paper-to-tickets",
+    "paper-frontier",
+    "paper-implement",
+    "paper-handoff",
+    "paper-status",
+    "paper-review",
+    "paper-sync",
+    "paper-final-audit",
+}
+skill_root = adapter_root / "skills"
+assert {
+    path.name for path in skill_root.iterdir() if path.is_dir()
+} == expected_skills
+for skill_name in expected_skills:
+    skill = skill_root / skill_name
+    skill_text = (skill / "SKILL.md").read_text()
+    metadata = (skill / "agents" / "openai.yaml").read_text()
+    assert re.search(rf"^name: {re.escape(skill_name)}$", skill_text, re.MULTILINE)
+    short_description = re.search(
+        r'^  short_description: "([^"]+)"$', metadata, re.MULTILINE
+    ).group(1)
+    default_prompt = re.search(
+        r'^  default_prompt: "([^"]+)"$', metadata, re.MULTILINE
+    ).group(1)
+    assert 25 <= len(short_description) <= 64
+    assert f"${skill_name}" in default_prompt
+    assert "source-command-" not in skill_text
+    assert "source-command-" not in metadata
+for runtime_path in ("commands", "lib", "bin", "hooks"):
+    assert not (adapter_root / runtime_path).exists()
 
 events = hooks["hooks"]
 assert set(events) == {"SessionStart", "UserPromptSubmit", "PreToolUse"}
@@ -103,6 +155,16 @@ then
     pass "manifest, marketplace, and Codex hook contracts are valid"
 else
     fail "manifest, marketplace, or Codex hook contract"
+fi
+
+if [[ -f "$PAPER_ADAPTER_MANIFEST" \
+   && ! -e "$REPO_ROOT/plugins/lean4-codex/commands" \
+   && ! -e "$REPO_ROOT/plugins/lean4-codex/lib" \
+   && ! -e "$REPO_ROOT/plugins/lean4-codex/bin" \
+   && ! -e "$REPO_ROOT/plugins/lean4-codex/hooks" ]]; then
+    pass "paper adapter exposes skills only and carries no runtime surface"
+else
+    fail "paper adapter introduced commands, runtime, wrappers, or hooks"
 fi
 
 if [[ -f "$CODEX_MANIFEST" && ! -L "$CODEX_MANIFEST" \
