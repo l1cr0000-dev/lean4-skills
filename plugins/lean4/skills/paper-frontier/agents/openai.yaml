@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paper Frontier"
+  short_description: "Find paper tickets ready for fresh execution"
+  default_prompt: "Use $paper-frontier to show the paper tickets that are safe to start."

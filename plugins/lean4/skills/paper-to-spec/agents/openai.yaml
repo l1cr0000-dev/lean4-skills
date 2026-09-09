@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paper to Spec"
+  short_description: "Freeze scope and synthesize the Paper Claim DAG"
+  default_prompt: "Use $paper-to-spec to create a durable formalization specification."

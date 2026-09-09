@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paper to Tickets"
+  short_description: "Derive obligations and contracted Lean tickets"
+  default_prompt: "Use $paper-to-tickets to turn this paper specification into safe ticket contracts."
