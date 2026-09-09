@@ -78,7 +78,7 @@ python3 <plugin-root>/lib/paper_architecture.py bind-ticket T-042 \
   --accept "lake env lean Paper/Estimates.lean" \
   --risk high --hard-unknowns 1
 ```
-Run this acceptance command from the Lean project root so its imports resolve against intended build artifacts; use `render-tickets` for a Markdown view and `paper-sync --approved` for explicit GitHub publication.
+Run this acceptance command from the Lean project root so its imports resolve against intended build artifacts; always run `render-tickets` after ticket changes, and use `paper-sync --approved` only after explicit confirmation when `--publish-github` is requested.
 
 Mutating tickets require owned files. Non-research formal tickets require
 executable acceptance commands. Research tickets may investigate but may not
