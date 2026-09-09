@@ -78,23 +78,7 @@ python3 <plugin-root>/lib/paper_architecture.py bind-ticket T-042 \
   --accept "lake env lean Paper/Estimates.lean" \
   --risk high --hard-unknowns 1
 ```
-Run this acceptance command from the Lean project root so its imports resolve against intended build artifacts.
-
-After the Ticket DAG is readable and approved, export a Markdown view with one
-file per ticket plus an index:
-
-```bash
-lean4-skills-paper-workflow render-tickets
-```
-
-This writes `.formalization/generated/tickets/README.md` and
-`.formalization/generated/tickets/<ticket-id>.md`. The JSON files under
-`.formalization/` remain authoritative; regenerate the Markdown view after
-changing the ticket graph.
-
-The optional `--publish-github` intent does not bypass the publication gate. It
-means: finish the local ticket plan, request explicit approval, then run the
-`paper-sync` workflow with `--approved`.
+Run this acceptance command from the Lean project root so its imports resolve against intended build artifacts; use `render-tickets` for a Markdown view and `paper-sync --approved` for explicit GitHub publication.
 
 Mutating tickets require owned files. Non-research formal tickets require
 executable acceptance commands. Research tickets may investigate but may not
