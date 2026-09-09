@@ -92,6 +92,10 @@ This writes `.formalization/generated/tickets/README.md` and
 `.formalization/` remain authoritative; regenerate the Markdown view after
 changing the ticket graph.
 
+The optional `--publish-github` intent does not bypass the publication gate. It
+means: finish the local ticket plan, request explicit approval, then run the
+`paper-sync` workflow with `--approved`.
+
 Mutating tickets require owned files. Non-research formal tickets require
 executable acceptance commands. Research tickets may investigate but may not
 complete formal proof obligations.
