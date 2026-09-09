@@ -1,0 +1,87 @@
+name: lean-integration
+
+# Real-toolchain integration suite for the file-gate / /disprove certification
+# sequence (#166, PR #195): one Linux job, one pinned Lean toolchain (the
+# fixture's lean-toolchain), no mathlib, no LSP. Separate from lint.yml so the
+# fast contract suites stay fast; the toolchain is cached, the fixture
+# projects' .lake directories are never cached (their state is the experiment).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lean-file-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          # The transaction helper's floor (stdlib tomllib in /disprove).
+          python-version: "3.11"
+
+      - name: Read the fixture's pinned toolchain
+        id: toolchain
+        run: |
+          tc=$(cat plugins/lean4/tests/fixtures/lean_file_gate/lean-toolchain)
+          echo "name=$tc" >> "$GITHUB_OUTPUT"
+          echo "pinned toolchain: $tc"
+
+      - name: Cache elan toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.elan
+          key: elan-${{ runner.os }}-${{ steps.toolchain.outputs.name }}
+
+      - name: Install elan + the pinned toolchain
+        run: |
+          set -euo pipefail
+          if [ ! -x "$HOME/.elan/bin/elan" ]; then
+            curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+              | sh -s -- -y --default-toolchain none
+          fi
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/elan" toolchain install "${{ steps.toolchain.outputs.name }}"
+
+      - name: Verify the toolchain actually used (fail loudly if absent)
+        working-directory: plugins/lean4/tests/fixtures/lean_file_gate
+        run: |
+          set -euo pipefail
+          lean --version
+          lake --version
+          v="${{ steps.toolchain.outputs.name }}"; v="${v##*:v}"
+          lean --version | grep -F "$v"
+
+      - name: Lean/Lake file-gate integration suite
+        env:
+          # On failure the suite exports each failing project (sources, .lake
+          # artifacts, and a COMMANDS.log transcript) here; uploaded below so
+          # the evidence outlives the runner.
+          LEAN_FILE_GATE_KEEP_DIR: ${{ runner.temp }}/lean_file_gate_failures
+        run: python3 plugins/lean4/tests/integration/test_lean_file_gate.py -v
+
+      - name: Core-Lean instance-registration snippets (SKILL.md § Type Class Patterns)
+        # Same pinned toolchain, no Mathlib. Positive cases show a downstream
+        # consumer synthesizing a have/let-supplied instance; each negative
+        # control is a #guard_msgs block, so the file fails if a documented
+        # failure stops failing.
+        working-directory: plugins/lean4/tests/fixtures/lean_file_gate
+        run: lean ../reference_snippets/core_instance_snippets.lean
+
+      - name: Upload failing projects + command transcripts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lean-file-gate-failures
+          path: ${{ runner.temp }}/lean_file_gate_failures
+          # v4 excludes dotfiles/dirs by default; the exported project's
+          # `.lake/` (its .olean artifact state) is the evidence this upload
+          # exists to keep. Path stays restricted to the failure directory.
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14

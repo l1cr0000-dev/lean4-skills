@@ -1681,6 +1681,549 @@ if [[ "$check38_ok" -eq 1 ]]; then
     ok "Check 38: run-contract/v1 handoff contract pinned (both records, reused vocab, files_owned≠files_changed, rerun guard, #82 deferral, cycle-engine + consumer wiring)"
 fi
 
+# ---------------------------------------------------------------------------
+# Check 39: file-gate scope (#166). `lake env lean File.lean` checks against
+# the built .oleans of the file's imports and does not rebuild them, so it can
+# false-pass (or false-fail) after an imported module changes. Pin the
+# canonical cycle-engine.md section (both failure directions, both recovery
+# paths, no universal "sound check" claim), the two originally misleading
+# sites, and the highest-risk cross-file editors. Deliberately NOT every
+# `lake env lean` mention — fast file-local checks stay legitimate.
+# ---------------------------------------------------------------------------
+check39_ok=1
+_c39_ce="$PLUGIN_ROOT/skills/lean4/references/cycle-engine.md"
+_c39_sf="$PLUGIN_ROOT/skills/lean4/references/sorry-filling.md"
+_c39_lsp="$PLUGIN_ROOT/skills/lean4/references/lean-lsp-server.md"
+
+# Canonical section, scoped to its heading.
+_c39_sec=$(extract_section "$_c39_ce" "### File Gate Scope")
+if [[ -z "$_c39_sec" ]]; then
+    fail "Check 39: cycle-engine.md missing '### File Gate Scope' section"
+    check39_ok=0
+else
+    for _c39_s in 'does not rebuild imported modules' 'false pass' 'false failure' \
+                  'Rebuild every changed imported module' 'for the importing target directly' \
+                  'dependency-aware' 'final verification may still require' \
+                  'lake lean <path/to/File.lean>'; do
+        if ! grep -qF -- "$_c39_s" <<<"$_c39_sec"; then
+            fail "Check 39: File Gate Scope section missing '$_c39_s'"
+            check39_ok=0
+        fi
+    done
+    # Negative: no universal soundness claim for lake build.
+    if grep -qiE 'lake build[^.]*\bis the sound check\b' <<<"$_c39_sec"; then
+        fail "Check 39: File Gate Scope must not call lake build 'the sound check' universally"
+        check39_ok=0
+    fi
+fi
+# Target spellings (Build Target Policy): current Lake accepts source paths; the
+# naive '/' -> '.' module-name derivation is wrong under a custom srcDir.
+_c39_btp=$(extract_section "$_c39_ce" "## Build Target Policy")
+if ! grep -qF 'never derive a module name by textually turning' <<<"$_c39_btp"; then
+    fail "Check 39: Build Target Policy must forbid deriving module names by textual / -> . conversion"
+    check39_ok=0
+fi
+if ! grep -qF 'lake lean <path/to/File.lean>' <<<"$_c39_btp"; then
+    fail "Check 39: Build Target Policy must mention lake lean <path/to/File.lean> (builds imports first)"
+    check39_ok=0
+fi
+for _c39_f in skills/lean4/references/cycle-engine.md skills/lean4/references/command-examples.md \
+              skills/lean4/references/disprove-engine.md; do
+    if grep -qiE 'lake build.{0,40}does not accept file path' "$PLUGIN_ROOT/$_c39_f"; then
+        fail "Check 39: $_c39_f still claims lake build does not accept file-path targets (false on current Lake)"
+        check39_ok=0
+    fi
+    if grep -qE '`/` (→|->) `\.`|replac(e|ing) `/` with `\.`|with `/` (→|->) `\.` and `\.lean` dropped' "$PLUGIN_ROOT/$_c39_f"; then
+        fail "Check 39: $_c39_f prescribes the naive / -> . module-name derivation (breaks on custom srcDir)"
+        check39_ok=0
+    fi
+done
+
+# The two sites #166 cited must carry the caveat + link, and the old
+# unqualified formulations must not return.
+_c39_step3=$(extract_section "$_c39_sf" "## Todo-Based Workflow (For Multiple Sorries)" | sed -n '/^\*\*Step 3: Verify compilation\*\*/,/^\*\*Step 4/p')
+if [[ -z "$_c39_step3" ]]; then
+    fail "Check 39: sorry-filling.md Todo-Based Workflow has no 'Step 3: Verify compilation' block"
+    check39_ok=0
+fi
+if ! grep -qF 'cycle-engine.md#file-gate-scope' <<<"$_c39_step3"; then
+    fail "Check 39: sorry-filling.md Step 3 must link cycle-engine.md#file-gate-scope"
+    check39_ok=0
+fi
+if ! grep -qF 'does not rebuild' <<<"$_c39_step3"; then
+    fail "Check 39: sorry-filling.md Step 3 must say the gate does not rebuild imports"
+    check39_ok=0
+fi
+if grep -qE '^lake env lean path/to/File\.lean +# run from project root$' "$_c39_sf"; then
+    fail "Check 39: sorry-filling.md still presents a bare, unqualified 'lake env lean' verification step"
+    check39_ok=0
+fi
+if grep -qE 'Reserve `lake env lean[^`]*` \(run from project root\) for file-level gates and' "$_c39_lsp"; then
+    fail "Check 39: lean-lsp-server.md still presents lake env lean as an unqualified file-level gate"
+    check39_ok=0
+fi
+if ! grep -qF 'cycle-engine.md#file-gate-scope' "$_c39_lsp"; then
+    fail "Check 39: lean-lsp-server.md must link cycle-engine.md#file-gate-scope"
+    check39_ok=0
+fi
+
+# Highest-risk cross-file editors must route to lake lean <path/to/File.lean> and link
+# the canonical section. (Not every mention — see header comment.)
+for _c39_f in agents/sorry-filler-deep.md agents/axiom-eliminator.md \
+              skills/lean4/references/proof-refactoring.md skills/lean4/SKILL.md; do
+    if ! grep -qF 'cycle-engine.md#file-gate-scope' "$PLUGIN_ROOT/$_c39_f"; then
+        fail "Check 39: $_c39_f must link cycle-engine.md#file-gate-scope"
+        check39_ok=0
+    fi
+done
+for _c39_f in agents/sorry-filler-deep.md agents/axiom-eliminator.md; do
+    if ! grep -qF 'lake lean <path/to/File.lean>' "$PLUGIN_ROOT/$_c39_f"; then
+        fail "Check 39: $_c39_f must route post-cross-file-edit gating to lake lean <path/to/File.lean>"
+        check39_ok=0
+    fi
+done
+# Quick references must distinguish the dependency-aware file gate (lake lean) from the project build.
+if ! grep -qE '^lake lean path/to/File\.lean +#' "$PLUGIN_ROOT/agents/sorry-filler-deep.md"; then
+    fail "Check 39: sorry-filler-deep.md quick reference must list the dependency-aware 'lake lean path/to/File.lean' line beside plain 'lake build'"
+    check39_ok=0
+fi
+
+# /disprove certification: the REFUTED license is lake lean on the resolved target file
+# (dependency-aware; accepts non-module files; writes no target .olean), never lake env lean.
+_c39_dcmd="$PLUGIN_ROOT/commands/disprove.md"
+_c39_deng="$PLUGIN_ROOT/skills/lean4/references/disprove-engine.md"
+_c39_dfix="$PLUGIN_ROOT/tests/pressure/disprove_prime_directive.md"
+_c39_pd_cmd=$(extract_section "$_c39_dcmd" "## Prime Directive")
+_c39_pd_eng=$(extract_section "$_c39_deng" "## Prime Directive — Epistemological Strictness")
+for _c39_pair in "disprove.md Prime Directive|$_c39_pd_cmd" "disprove-engine.md Prime Directive|$_c39_pd_eng"; do
+    _c39_name="${_c39_pair%%|*}"; _c39_text="${_c39_pair#*|}"
+    if [[ -z "$_c39_text" ]]; then
+        fail "Check 39: $_c39_name section not found"
+        check39_ok=0
+        continue
+    fi
+    if ! grep -qF 'lake lean <target-file>' <<<"$_c39_text"; then
+        fail "Check 39: $_c39_name must license REFUTED via lake lean <target-file>"
+        check39_ok=0
+    fi
+    if ! grep -qE 'lake env lean.*(pre-screen|never the license)' <<<"$_c39_text"; then
+        fail "Check 39: $_c39_name must demote lake env lean to a pre-screen"
+        check39_ok=0
+    fi
+done
+_c39_p3=$(extract_section "$_c39_deng" "## Phase 3 — Checkpoint")
+if [[ -z "$_c39_p3" ]]; then
+    fail "Check 39: disprove-engine.md '## Phase 3 — Checkpoint' section not found"
+    check39_ok=0
+else
+    if ! grep -qE 'Compile gate.*lake lean <target-file>' <<<"$_c39_p3" || ! grep -qF 'This is unconditional' <<<"$_c39_p3"; then
+        fail "Check 39: disprove-engine.md Phase 3 compile gate must be an unconditional lake lean <target-file>"
+        check39_ok=0
+    fi
+    if ! grep -qE 're-run[[:space:]]*$' <<<"$_c39_p3" || ! grep -qF '`lake lean <target-file>` on the gate-free file' <<<"$_c39_p3"; then
+        fail "Check 39: disprove-engine.md Phase 3 must rerun lake lean on the gate-free file after dropping the gate blocks"
+        check39_ok=0
+    fi
+fi
+for _c39_f in "$_c39_dcmd" "$_c39_deng"; do
+    if grep -qE 'REFUTED. requires (\*\*both\*\* )?`lake env lean' "$_c39_f"; then
+        fail "Check 39: $(basename "$_c39_f") still says REFUTED requires lake env lean"
+        check39_ok=0
+    fi
+done
+# /disprove worked examples (command-examples.md): the compile gate shown before
+# REFUTED must be the dependency-aware lake lean, never lake env lean (and never a targeted lake build, which writes the target .olean and cannot build a non-module file).
+# Section-scoped to the two worked examples so unrelated future examples can
+# neither satisfy nor trip these assertions.
+_c39_cex="$PLUGIN_ROOT/skills/lean4/references/command-examples.md"
+# The verification-ladder mirror must recommend the dependency-aware file gate,
+# not the version-dependent, module-only targeted build, after a cross-file edit.
+if ! grep -qF 'after editing an imported module, run `lake lean <path/to/File.lean>`' "$_c39_cex"; then
+    fail "Check 39: command-examples.md ladder note must route post-import-edit gating to lake lean <path/to/File.lean>"
+    check39_ok=0
+fi
+if grep -qE 'after editing an imported module, run `lake build <path' "$_c39_cex"; then
+    fail "Check 39: command-examples.md ladder note recommends a targeted lake build after an import edit again"
+    check39_ok=0
+fi
+for _c39_h in '### Cycle 1 — decide-cascade Win Example' \
+              '### Cycle 1 mine miss → cycle 2 enumerate widen + certify'; do
+    _c39_ex=$(extract_section "$_c39_cex" "$_c39_h")
+    if [[ -z "$_c39_ex" ]]; then
+        fail "Check 39: command-examples.md section '$_c39_h' not found"
+        check39_ok=0
+        continue
+    fi
+    if grep -qE 'Compile gate.*lake env lean' <<<"$_c39_ex"; then
+        fail "Check 39: '$_c39_h' still shows lake env lean as the compile gate before REFUTED"
+        check39_ok=0
+    fi
+    if ! grep -qE '^Compile gate \(lake lean [^)]*\): passed' <<<"$_c39_ex"; then
+        fail "Check 39: '$_c39_h' must show an explicit 'Compile gate (lake lean <target-file> ...): passed'"
+        check39_ok=0
+    fi
+    if ! grep -qE '^Axiom gate \(#print axioms [A-Za-z_]+, read from the same lake lean run\)' <<<"$_c39_ex"; then
+        fail "Check 39: '$_c39_h' must show the axiom gate as #print axioms read from the same lake lean run"
+        check39_ok=0
+    fi
+    if ! grep -qE 'Dropped gate-only.*re-checked with lake lean [^:]*: passed' <<<"$_c39_ex"; then
+        fail "Check 39: '$_c39_h' must show the post-wrapper re-check as a lake lean"
+        check39_ok=0
+    fi
+    if grep -qE '^Compile gate: passed' <<<"$_c39_ex"; then
+        fail "Check 39: '$_c39_h' has a generic 'Compile gate: passed' line — name the lake lean gate"
+        check39_ok=0
+    fi
+done
+# The license must not drift back to a targeted `lake build <target-file>`:
+# it is `unknown target` for an accepted non-module File.lean:LINE target, and
+# it writes the target .olean, so a source rollback after a failed axiom gate
+# would leave the rejected declarations in the artifact (#195 review round 5).
+for _c39_pair in "disprove.md Prime Directive|$_c39_pd_cmd" "disprove-engine.md Prime Directive|$_c39_pd_eng"; do
+    _c39_name="${_c39_pair%%|*}"; _c39_text="${_c39_pair#*|}"
+    if grep -qF 'lake build <target-file>' <<<"$_c39_text" || grep -qE 'REFUTED.*requires.*`lake build' <<<"$_c39_text"; then
+        fail "Check 39: $_c39_name licenses REFUTED via a targeted lake build again — the gate is lake lean <target-file>"
+        check39_ok=0
+    fi
+done
+if [[ -n "$_c39_p3" ]]; then
+    for _c39_s in 'outside any `lean_lib`' 'does **not** write the target'; do
+        if ! grep -qF -- "$_c39_s" <<<"$_c39_p3"; then
+            fail "Check 39: disprove-engine.md Phase 3 must state why lake lean is the gate ($_c39_s)"
+            check39_ok=0
+        fi
+    done
+    if grep -qE 'Compile gate.*`lake build <target-file>`' <<<"$_c39_p3"; then
+        fail "Check 39: disprove-engine.md Phase 3 compile gate is a targeted lake build again"
+        check39_ok=0
+    fi
+fi
+# Axiom gate freshness: the licensing #print axioms must be elaborated by the
+# same lake lean run as the compile gate. lean_verify goes through the LSP's
+# persistent scratch pool, whose import snapshot can lag the rebuilt imports.
+if [[ -n "$_c39_p3" ]]; then
+    for _c39_s in '`#print axioms T_counterexample`' '`#print axioms T_counterexample_negates_target`' 'deliberately **unqualified**' \
+                  '--role=gate --decl=T_counterexample_axioms' \
+                  'same `lake lean` run' 'advisory cross-check only'; do
+        if ! grep -qF -- "$_c39_s" <<<"$_c39_p3"; then
+            fail "Check 39: disprove-engine.md Phase 3 axiom gate must be the same-run #print axioms probe ($_c39_s)"
+            check39_ok=0
+        fi
+    done
+    if grep -qE 'via `lean_verify` \(or `#print axioms`\)|`lean_verify` / `#print axioms`' <<<"$_c39_p3"; then
+        fail "Check 39: disprove-engine.md Phase 3 presents lean_verify and #print axioms as interchangeable licensing routes"
+        check39_ok=0
+    fi
+    # The probe must be UNQUALIFIED: blocks land at end-of-file, where a
+    # namespace left open makes the artifact N.T_counterexample; `_root_.`
+    # would inspect an imported root declaration of the same name instead.
+    if grep -qF '#print axioms _root_.' <<<"$_c39_p3"; then
+        fail "Check 39: disprove-engine.md Phase 3 probe is root-qualified (_root_.) — it must be the unqualified name so it resolves to the just-appended declaration"
+        check39_ok=0
+    fi
+fi
+if grep -qF '#print axioms _root_.' "$_c39_dcmd" "$_c39_cex"; then
+    fail "Check 39: a /disprove axiom probe is root-qualified (_root_.) — use the unqualified name"
+    check39_ok=0
+fi
+if grep -qE 'via `lean_verify` / `#print axioms`|via `lean_verify` \(or `#print axioms`\)' "$_c39_dcmd"; then
+    fail "Check 39: disprove.md presents lean_verify and #print axioms as interchangeable licensing routes"
+    check39_ok=0
+fi
+if ! grep -qF "from that same run's" "$_c39_dcmd"; then
+    fail "Check 39: disprove.md Phase 3 summary must read the axiom set from the same lake lean run"
+    check39_ok=0
+fi
+if grep -qF 'Lake 5 accepts' "$_c39_ce" "$_c39_cex" "$_c39_deng"; then
+    fail "Check 39: 'Lake 5 accepts source paths' is not a valid version boundary (Lean 4.19's Lake also reports 5.0.0 and did not)"
+    check39_ok=0
+fi
+# Pressure fixture: must teach the corrected rule; the old sentence must not return.
+if [[ ! -f "$_c39_dfix" ]]; then
+    fail "Check 39: missing tests/pressure/disprove_prime_directive.md"
+    check39_ok=0
+else
+    if grep -qF 'only `lake env lean <path>`' "$_c39_dfix"; then
+        fail "Check 39: pressure fixture still teaches that only lake env lean licenses the disproved claim (#166 proved that unsound)"
+        check39_ok=0
+    fi
+    if ! grep -qF 'lake lean <target-file>' "$_c39_dfix"; then
+        fail "Check 39: pressure fixture must name lake lean <target-file> as the license"
+        check39_ok=0
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Check 40: golf escalation routing (#55). axiom-eliminator is axiom/assumption
+# hygiene only; golf's "statement change / multi-file refactor" handoffs must
+# route statement changes to a report (never applied) and multi-file or
+# strategy-level work to /lean4:refactor, in every golf-side site.
+# ---------------------------------------------------------------------------
+check40_ok=1
+for _c40_f in commands/golf.md agents/proof-golfer.md skills/lean4/references/proof-golfing.md; do
+    _c40_p="$PLUGIN_ROOT/$_c40_f"
+    # Clause-scoped: routes are separated by `;` or `.`, so a later clause
+    # that names axiom-eliminator for axiom hygiene does not trip this.
+    if grep -qiE '(statement change|multi-file)[^.;]*axiom-eliminator|axiom-eliminator[^.;]*(statement change|multi-file)' "$_c40_p"; then
+        fail "Check 40: $_c40_f still routes statement changes / multi-file refactor to axiom-eliminator"
+        check40_ok=0
+    fi
+    if ! grep -qE 'multi-file[^.]*`/lean4:refactor`' "$_c40_p"; then
+        fail "Check 40: $_c40_f must route multi-file / strategy-level refactor to \`/lean4:refactor\`"
+        check40_ok=0
+    fi
+    if ! grep -qiE 'axiom-eliminator \*?\*?only\*?\*? for axiom' "$_c40_p"; then
+        fail "Check 40: $_c40_f must restrict the axiom-eliminator handoff to axiom/assumption hygiene"
+        check40_ok=0
+    fi
+    if ! grep -qiE 'statement change[^.]*(report|never (changes|applies|apply))' "$_c40_p"; then
+        fail "Check 40: $_c40_f must report (not apply) a needed statement change"
+        check40_ok=0
+    fi
+    # Per-SITE consistency (the anchors above are existential per file):
+    # every line that mentions multi-file work must name /lean4:refactor, and
+    # every line that hands off to axiom-eliminator must restrict it to axiom
+    # hygiene — so one drifted duplicate site cannot hide behind a correct one.
+    while IFS= read -r _c40_line; do
+        if ! grep -qF '`/lean4:refactor`' <<<"$_c40_line"; then
+            fail "Check 40: $_c40_f has a multi-file routing line that does not name \`/lean4:refactor\`: ${_c40_line:0:100}"
+            check40_ok=0
+        fi
+    done < <(grep -iE 'multi-file' "$_c40_p" | grep -viE '^\s*[0-9]+\.\s|lake build')
+    while IFS= read -r _c40_line; do
+        if ! grep -qiE 'only\*?\*? for axiom' <<<"$_c40_line"; then
+            fail "Check 40: $_c40_f hands off to axiom-eliminator without restricting it to axiom hygiene: ${_c40_line:0:100}"
+            check40_ok=0
+        fi
+    done < <(grep -iE 'hand(s|ed)? off to axiom-eliminator|axiom-eliminator (only|if|for|when)' "$_c40_p")
+done
+# Duplicated sites must both be present (Actions + Constraints in the agent;
+# Phase 2.5 + Handoff in the reference).
+for _c40_pair in "agents/proof-golfer.md|2" "skills/lean4/references/proof-golfing.md|2"; do
+    _c40_f="${_c40_pair%%|*}"; _c40_min="${_c40_pair#*|}"
+    _c40_n=$(grep -cE 'multi-file[^.]*`/lean4:refactor`' "$PLUGIN_ROOT/$_c40_f")
+    if [[ "$_c40_n" -lt "$_c40_min" ]]; then
+        fail "Check 40: $_c40_f must carry the routing at $_c40_min sites (found $_c40_n)"
+        check40_ok=0
+    fi
+done
+# The statement-change signal: an unsuitable golf CANDIDATE is not evidence the
+# statement is wrong, so the agent must stop (next_action = stop), never redraft.
+_c40_ag="$PLUGIN_ROOT/agents/proof-golfer.md"
+if grep -qiE 'next_action[[:space:]]*=[[:space:]]*redraft' "$_c40_ag"; then
+    fail "Check 40: proof-golfer.md routes a statement-changing candidate to next_action = redraft (wrong signal: candidate unsuitability ≠ wrong statement)"
+    check40_ok=0
+fi
+if ! grep -qF '`next_action = stop`' "$_c40_ag"; then
+    fail "Check 40: proof-golfer.md must hand a statement-change decision back with next_action = stop"
+    check40_ok=0
+fi
+if ! grep -qiE 'multi-file[^.;]*parent' "$_c40_ag"; then
+    fail "Check 40: proof-golfer.md must return the multi-file proposal to the parent (no self-expanded ownership)"
+    check40_ok=0
+fi
+if ! grep -qF 'Escalation target for `/lean4:golf`' "$PLUGIN_ROOT/commands/refactor.md"; then
+    fail "Check 40: refactor.md must document that it is golf's escalation target"
+    check40_ok=0
+fi
+if grep -qF 'Golf is local tactic cleanup of one proof' "$PLUGIN_ROOT/commands/refactor.md" "$PLUGIN_ROOT/skills/lean4/references/proof-golfing.md"; then
+    fail "Check 40: 'Golf is local tactic cleanup of one proof' contradicts golf's documented file/project scope — say statement-preserving cleanup, potentially across many proofs"
+    check40_ok=0
+fi
+if ! grep -qE '^6\. \*\*Verify\*\* — `lake lean <file>`' "$PLUGIN_ROOT/commands/refactor.md"; then
+    fail "Check 40: refactor.md Verify step must use the dependency-aware lake lean file gate (cross-file batches)"
+    check40_ok=0
+fi
+if [[ "$check40_ok" -eq 1 ]]; then
+    ok "Check 40: golf escalation routing pinned (#55: statement changes reported, multi-file/strategy → /lean4:refactor, axiom-eliminator = axiom hygiene only)"
+fi
+
+# ---------------------------------------------------------------------------
+# Check 41: local-instance guidance (#188 + #162). In Lean 4 plain have/let
+# register class-typed locals for synthesis; haveI/letI differ only by
+# inlining, which is irrelevant in a proof (Mathlib's HaveILetI linter). The
+# skill must state that rule and no proof-context example may prescribe
+# haveI/letI; measure-theory must not carry the stale trim idioms.
+# ---------------------------------------------------------------------------
+check41_ok=1
+_c41_skill="$PLUGIN_ROOT/skills/lean4/SKILL.md"
+_c41_sec=$(extract_section "$_c41_skill" "## Type Class Patterns")
+if [[ -z "$_c41_sec" ]]; then
+    fail "Check 41: SKILL.md missing '## Type Class Patterns'"
+    check41_ok=0
+else
+    for _c41_s in 'register local instances themselves' 'differ only by' 'inlining' \
+                  'Linter/HaveILetI.html' 'check whether synthesis already succeeds'; do
+        if ! grep -qiF -- "$_c41_s" <<<"$_c41_sec"; then
+            fail "Check 41: SKILL.md Type Class Patterns must state the have/let vs haveI/letI rule ($_c41_s)"
+            check41_ok=0
+        fi
+    done
+    if grep -qE '^(haveI|letI) :' <<<"$_c41_sec"; then
+        fail "Check 41: SKILL.md Type Class Patterns still prescribes haveI/letI in its example"
+        check41_ok=0
+    fi
+fi
+# No proof-context example line may START with haveI/letI (diff '+' lines
+# and indented tactic lines included); prose that EXPLAINS the difference may
+# still name them.
+for _c41_f in skills/lean4/SKILL.md skills/lean4/references/compilation-errors.md \
+              skills/lean4/references/instance-pollution.md skills/lean4/references/measure-theory.md \
+              skills/lean4/references/domain-patterns.md skills/lean4/references/compiler-guided-repair.md \
+              skills/lean4/references/tactic-patterns.md skills/lean4/references/agent-workflows.md; do
+    # Allowance: a deliberate data-definition example (where `letI` inlining
+    # is meaningful) is permitted when the line carries a `-- data:` marker.
+    if grep -E '^[+ ]*(haveI|letI)( [A-Za-z_]+)? :' "$PLUGIN_ROOT/$_c41_f" | grep -qv -- '-- data:'; then
+        fail "Check 41: $_c41_f still shows a haveI/letI example line in a proof context (mark a deliberate data-definition example with '-- data:'): $(grep -E '^[+ ]*(haveI|letI)( [A-Za-z_]+)? :' "$PLUGIN_ROOT/$_c41_f" | grep -v -- '-- data:' | head -1 | cut -c1-90)"
+        check41_ok=0
+    fi
+done
+# #162: the two obsolete trim idioms must not return anywhere in the docs.
+if grep -rqE 'isFiniteMeasure_trim μ hm|sigmaFinite_trim μ hm' "$PLUGIN_ROOT" --include='*.md'; then
+    fail "Check 41: stale trim idiom (isFiniteMeasure_trim μ hm / sigmaFinite_trim μ hm) is back — IsFiniteMeasure (μ.trim hm) is a Mathlib instance and plain sigmaFinite_trim no longer exists"
+    check41_ok=0
+fi
+_c41_mt="$PLUGIN_ROOT/skills/lean4/references/measure-theory.md"
+if ! grep -qF 'have : SigmaFinite (μ.trim hm) := inferInstance' "$_c41_mt"; then
+    fail "Check 41: measure-theory.md must show the optional σ-finiteness freeze via plain have + inferInstance"
+    check41_ok=0
+fi
+if ! grep -qiF 'check whether synthesis already succeeds' "$_c41_mt"; then
+    fail "Check 41: measure-theory.md must tell the reader to check synthesis before adding local instances"
+    check41_ok=0
+fi
+# Lean-3-isms / stale Mathlib names found by the reference audit must not return:
+# `apply_instance` (Lean 4: infer_instance), the pre-2024 `condexp` /
+# `set_integral_condexp` spellings (now condExp / setIntegral_condExp), and the
+# nonexistent `condExp_unique`.
+if grep -rqE '\bapply_instance\b' "$PLUGIN_ROOT/skills" "$PLUGIN_ROOT/commands" "$PLUGIN_ROOT/agents" --include='*.md'; then
+    fail "Check 41: apply_instance (Lean 3) is back — Lean 4 is infer_instance"
+    check41_ok=0
+fi
+if grep -rE '[A-Za-z]_condexp\b|\bset_integral_condexp\b|\bcondExp_unique\b' "$PLUGIN_ROOT/skills" --include='*.md' | grep -qv 'there is no `condExp_unique`'; then
+    fail "Check 41: stale Mathlib name (…_condexp / set_integral_condexp / condExp_unique) is back — use …_condExp / setIntegral_condExp / ae_eq_condExp_of_forall_setIntegral_eq"
+    check41_ok=0
+fi
+# Compile-checked corrections from the #200 review (each of these forms was
+# elaborated against Mathlib; see tests/fixtures/reference_snippets/).
+_c41_mt="$PLUGIN_ROOT/skills/lean4/references/measure-theory.md"
+for _c41_s in 'stronglyMeasurable_condExp.aestronglyMeasurable' \
+              'Measure.isProbabilityMeasure_map hf' \
+              '(hm : m ≤ m₀)' \
+              'setIntegral_condExp hm hg hs'; do
+    if ! grep -qF -- "$_c41_s" "$_c41_mt"; then
+        fail "Check 41: measure-theory.md must carry the compile-checked form '$_c41_s'"
+        check41_ok=0
+    fi
+done
+# Negative forms are matched as CODE (a bare identifier use, a binder, an
+# application), so a sentence that explains why a form is wrong does not trip.
+if grep -E 'aestronglyMeasurable_condExp' "$_c41_mt" | grep -qv 'there is no'; then
+    fail "Check 41: measure-theory.md uses the nonexistent aestronglyMeasurable_condExp (use stronglyMeasurable_condExp.aestronglyMeasurable)"
+    check41_ok=0
+fi
+for _c41_bad in 'isProbabilityMeasure_map hf hμ' ': Measure β) : Type)' '(hm : m ≤ ‹_›)'; do
+    if grep -qF -- "$_c41_bad" "$_c41_mt"; then
+        fail "Check 41: measure-theory.md regained a form that does not elaborate: $_c41_bad"
+        check41_ok=0
+    fi
+done
+if grep -E '`swap n`|`rotate`,|`rotate n`|termination_by my_rec n => n' "$PLUGIN_ROOT/skills/lean4/references/lean-phrasebook.md" "$PLUGIN_ROOT/skills/lean4/references/compilation-errors.md" | grep -qvE 'not Lean 4 tactics|is rejected'; then
+    fail "Check 41: obsolete goal-management (swap n / rotate) or pre-4.6 termination_by form is back"
+    check41_ok=0
+fi
+# A genuinely missing instance is never fixed by `:= inferInstance` (it re-runs
+# the failed search); the repair/review recipes must supply evidence instead.
+# Lines that SAY so ("re-runs", "only freezes", "not `:= inferInstance`") pass.
+for _c41_f in commands/review.md skills/lean4/references/command-examples.md \
+              skills/lean4/references/compiler-guided-repair.md skills/lean4/references/agent-workflows.md; do
+    if grep -E '(missing|Missing|Need|need|Add instance|Provide instance)[^.]*:= inferInstance' "$PLUGIN_ROOT/$_c41_f" | grep -qvE 're-runs|only freezes|not `:= inferInstance`|would just fail again'; then
+        fail "Check 41: $_c41_f prescribes ':= inferInstance' as the fix for a MISSING instance (it only freezes one that already synthesizes)"
+        check41_ok=0
+    fi
+done
+# Supplied-instance recipes must state their prerequisites: `borel β` needs a
+# topology (and Borel must be the intended σ-algebra); the DiscreteTopology
+# repair needs evidence that the topology is ⊥ (`⟨rfl⟩` proves it only then).
+# The prerequisite may sit on the recipe line itself or on the line just
+# before / after it (a wrapped bullet), not only on the same line.
+while IFS=: read -r _c41_bf _c41_bl _; do
+    [[ -n "$_c41_bf" ]] || continue
+    if ! sed -n "$(( _c41_bl > 1 ? _c41_bl - 1 : 1 )),$(( _c41_bl + 1 ))p" "$_c41_bf" | grep -qiE 'TopologicalSpace|topology'; then
+        fail "Check 41: a borel recipe does not state its topology prerequisite (same or adjacent line): ${_c41_bf#"$PLUGIN_ROOT"/}:$_c41_bl"
+        check41_ok=0
+    fi
+done < <(grep -rn 'borel [A-Za-zαβ]' "$PLUGIN_ROOT/skills" "$PLUGIN_ROOT/commands" --include='*.md')
+_c41_aw="$PLUGIN_ROOT/skills/lean4/references/agent-workflows.md"
+if grep -qF 'DiscreteTopology α := ⟨rfl⟩' "$_c41_aw"; then
+    fail "Check 41: agent-workflows.md proves DiscreteTopology with ⟨rfl⟩ (only valid when the topology is literally ⊥); cite the evidence"
+    check41_ok=0
+fi
+if ! grep -qF 'DiscreteTopology α := ⟨hdisc⟩' "$_c41_aw"; then
+    fail "Check 41: agent-workflows.md DiscreteTopology repair must cite its evidence (hdisc)"
+    check41_ok=0
+fi
+# instance-pollution must not claim plain let is "just data" for a class type.
+if grep -qF 'For data, use plain `let`' "$PLUGIN_ROOT/skills/lean4/references/instance-pollution.md"; then
+    fail "Check 41: instance-pollution.md still claims plain let avoids registering a class-typed local as an instance"
+    check41_ok=0
+fi
+# Round 4 (#200): `MeasurableSpace.comap f m` takes the CODOMAIN structure, so
+# `comap Z m0` with `m0 : MeasurableSpace Ω` (the domain) is a type error; the
+# σ-algebra-relations block is the compile-checked form (named ambient
+# structures, product codomain for the joint σ-algebra, `prodMk`,
+# `comap_le_comap_of_eq_comp`, and the transport line naming `[mΩ]`).
+_c41_ip="$PLUGIN_ROOT/skills/lean4/references/instance-pollution.md"
+for _c41_f in "$_c41_mt" "$_c41_ip"; do
+    if grep -qE 'MeasurableSpace\.comap [^ ]+ m0\b' "$_c41_f"; then
+        fail "Check 41: ${_c41_f#"$PLUGIN_ROOT"/} comaps the DOMAIN structure (comap Z m0); comap takes the codomain structure (mβ / mβ.prod mγ)"
+        check41_ok=0
+    fi
+    if grep -qE '\.prod_mk\b|drifts from ambient|NEVER use `set`|‹MeasurableSpace Ω› := hW' "$_c41_f"; then
+        fail "Check 41: ${_c41_f#"$PLUGIN_ROOT"/} regained a round-4 rejected form (prod_mk / 'drifts from ambient' / categorical NEVER-use-set / ‹MeasurableSpace Ω› bound)"
+        check41_ok=0
+    fi
+done
+for _c41_s in 'MeasurableSpace.comap W mγ' '(mβ.prod mγ)' \
+              'MeasurableSpace.comap_le_comap_of_eq_comp Prod.snd measurable_snd rfl' \
+              'StronglyMeasurable[mΩ] (μ[f|mW])' 'sigmaFinite_trim_bot_iff' \
+              'unresolved metavariables'; do
+    if ! grep -qF -- "$_c41_s" "$_c41_mt"; then
+        fail "Check 41: measure-theory.md must carry the round-4 compile-checked form / prerequisite '$_c41_s'"
+        check41_ok=0
+    fi
+done
+if ! grep -qF 'MeasurableSpace.comap Z mβ' "$_c41_ip"; then
+    fail "Check 41: instance-pollution.md must define the sub-σ-algebra as comap of the codomain structure (comap Z mβ)"
+    check41_ok=0
+fi
+_c41_ce="$PLUGIN_ROOT/skills/lean4/references/compilation-errors.md"
+if grep -qF 'have := ⟨' "$_c41_ce"; then
+    fail "Check 41: compilation-errors.md shows an untyped 'have := ⟨proof⟩' (the instance type must be stated: have : C := ⟨proof⟩)"
+    check41_ok=0
+fi
+if ! grep -F 'typeclass instance problem is stuck' "$_c41_ce" | grep -qi 'metavariable'; then
+    fail "Check 41: compilation-errors.md must explain 'typeclass instance problem is stuck' as unresolved metavariables in the class arguments (not a missing instance)"
+    check41_ok=0
+fi
+# The core-Lean evidence for the have/let rule runs in CI with the pinned
+# toolchain; the fixture and its workflow step must both exist.
+if [[ ! -f "$PLUGIN_ROOT/tests/fixtures/reference_snippets/core_instance_snippets.lean" ]]; then
+    fail "Check 41: tests/fixtures/reference_snippets/core_instance_snippets.lean (core-Lean have/let evidence) is missing"
+    check41_ok=0
+fi
+if ! grep -qF 'reference_snippets/core_instance_snippets.lean' "$PLUGIN_ROOT/../../.github/workflows/lean-integration.yml"; then
+    fail "Check 41: lean-integration.yml no longer runs core_instance_snippets.lean"
+    check41_ok=0
+fi
+if [[ "$check41_ok" -eq 1 ]]; then
+    ok "Check 41: local-instance guidance pinned (#188/#162: have/let register instances, haveI/letI = inlining only + linter; no haveI/letI example lines; stale trim idioms gone; synthesis-first rule; comap takes the codomain structure; core-Lean fixture in CI)"
+fi
+
+if [[ "$check39_ok" -eq 1 ]]; then
+    ok "Check 39: file-gate scope pinned (#166: canonical section w/ both failure directions + both recovery paths, cited sites corrected, cross-file editors routed, disprove REFUTED licensed by lake lean <target-file>, no naive module-name derivation)"
+fi
+
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
 [[ "$FAIL" -eq 0 ]]
