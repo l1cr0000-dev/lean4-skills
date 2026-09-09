@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Model-facing wrapper for the paper workflow helper.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+exec python3 "$PLUGIN_ROOT/lib/paper_workflow.py" "$@"

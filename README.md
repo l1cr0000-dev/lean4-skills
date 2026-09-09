@@ -54,6 +54,11 @@ codex plugin add lean4@lean4-skills
 
 Typical session: `draft` (or `formalize` / `autoformalize`) → `prove` (or `autoprove`) → `review` → `refactor` → `golf` → `checkpoint` → `git push`. Use `disprove` instead of `prove` to refute a statement rather than prove it.
 
+For paper-scale work across fresh contexts, use the additive orchestration
+layer: `paper-grill` → `paper-to-spec` → `paper-to-tickets` →
+`paper-frontier` → `paper-implement` → `paper-final-audit`. It preserves the
+theorem-level workflows and records durable planning state in `.formalization/`.
+
 CLI-like inputs to the seven parameter-heavy commands are validated by a host-agnostic parser — see the [Command Invocation Contract](plugins/lean4/skills/lean4/references/command-invocation.md).
 
 ## The Shared Proof Cycle

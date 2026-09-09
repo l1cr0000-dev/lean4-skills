@@ -25,6 +25,21 @@ Unified Lean 4 plugin for theorem proving, interactive learning, and formalizati
 | `/lean4:learn` | Interactive teaching and mathlib exploration |
 | `/lean4:diagnose` | Diagnostics, cleanup, and migration help |
 
+### Paper-scale orchestration
+
+| Command | Description |
+|---------|-------------|
+| `/lean4:paper-grill` | Stateful interview that freezes paper formalization scope, trust boundary, statement policy, and completion criteria |
+| `/lean4:paper-to-spec` | Synthesize a durable formalization spec and macro paper-claim DAG from resolved grill decisions |
+| `/lean4:paper-to-tickets` | Split a formalization spec into one-fresh-context Lean tickets with explicit blocking edges |
+| `/lean4:paper-frontier` | Compute paper-formalization tickets that are actually ready for a fresh session |
+| `/lean4:paper-implement` | Execute exactly one paper-formalization ticket in a fresh context using existing lean4-skills proof engines |
+| `/lean4:paper-handoff` | Persist an unfinished Lean paper ticket so a fresh context can resume without reconstructing history |
+| `/lean4:paper-status` | Show durable paper workflow phase, claim/ticket counts, frontier, and tracker mappings |
+| `/lean4:paper-review` | Read-only audit of paper-level scope, trust boundary, claim DAG, ticket DAG, statement locks, and handoffs |
+| `/lean4:paper-sync` | Explicitly project local paper spec, ticket DAG, ticket completion, or handoff state to GitHub Issues |
+| `/lean4:paper-final-audit` | Compute final trust status for target theorem closure, including trusted external premises and unfinished work |
+
 `/lean4:*` entries are Claude Code aliases; under Codex, invoke `$lean4` and
 ask for the named workflow.
 
@@ -34,6 +49,10 @@ transcripts live in
 inputs to the seven parameter-heavy commands are validated by a host-agnostic
 parser — see the
 [Command Invocation Contract](skills/lean4/references/command-invocation.md).
+
+The paper commands are a durable orchestration layer for work that spans fresh
+contexts. They preserve the existing theorem workflows and persist recovery
+state under `.formalization/`; GitHub Issues remain a projection of that state.
 
 **Without a command:** editing `.lean` files activates the skill for one
 bounded pass — it fixes the immediate issue (a build error, a single sorry),
