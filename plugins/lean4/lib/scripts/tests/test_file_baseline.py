@@ -229,7 +229,7 @@ class FileBaselineTests(unittest.TestCase):
         os.chdir(proj)
         base = self.record("Foo.lean")  # relative at record time
         stored = json.loads(base)["files"][0]["path"]
-        self.assertEqual(stored, real_file)  # stored absolute
+        self.assertEqual(stored, os.path.realpath(real_file))  # stored absolute
         os.chdir(decoy_dir)  # cwd now contains a same-named decoy
         code, result = self.check(base)
         self.assertEqual(code, 0, result)  # checks proj/Foo.lean, not decoy
@@ -246,7 +246,7 @@ class FileBaselineTests(unittest.TestCase):
             f.write("\n-- advanced")
         code, out, err = run(["advance", "--baseline", "-", stored], stdin=base)
         self.assertEqual(code, 0, err)
-        self.assertEqual(json.loads(out)["files"][0]["path"], real_file)
+        self.assertEqual(json.loads(out)["files"][0]["path"], os.path.realpath(real_file))
 
     def test_dangling_symlink_retarget_is_drift(self) -> None:
         # Dangling A -> dangling B: both absent, but the resolved identity

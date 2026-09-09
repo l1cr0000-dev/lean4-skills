@@ -49,6 +49,21 @@ Per-command policy lives in each command's doc. The docstring split applies in e
 | `/lean4:learn` | Interactive teaching and mathlib exploration |
 | `/lean4:diagnose` | Diagnostics, cleanup, and migration help |
 
+### Paper-scale orchestration
+
+| Command | Purpose |
+|---------|---------|
+| `/lean4:paper-grill` | Stateful interview that freezes paper formalization scope, trust boundary, statement policy, and completion criteria |
+| `/lean4:paper-to-spec` | Synthesize a durable formalization spec and macro paper-claim DAG from resolved grill decisions |
+| `/lean4:paper-to-tickets` | Split a formalization spec into one-fresh-context Lean tickets with explicit blocking edges |
+| `/lean4:paper-frontier` | Compute paper-formalization tickets that are actually ready for a fresh session |
+| `/lean4:paper-implement` | Execute exactly one paper-formalization ticket in a fresh context using existing lean4-skills proof engines |
+| `/lean4:paper-handoff` | Persist an unfinished Lean paper ticket so a fresh context can resume without reconstructing history |
+| `/lean4:paper-status` | Show durable paper workflow phase, claim/ticket counts, frontier, and tracker mappings |
+| `/lean4:paper-review` | Read-only audit of paper-level scope, trust boundary, claim DAG, ticket DAG, statement locks, and handoffs |
+| `/lean4:paper-sync` | Explicitly project local paper spec, ticket DAG, ticket completion, or handoff state to GitHub Issues |
+| `/lean4:paper-final-audit` | Compute final trust status for target theorem closure, including trusted external premises and unfinished work |
+
 `/lean4:*` names are the native plugin's command aliases and also serve
 as stable workflow names throughout this documentation. On hosts
 without command registration (skill-only or portable installs), invoke
@@ -431,3 +446,23 @@ lean4-skills-sorry-analyzer . --report-only
 **Workflows:** [agent-workflows](references/agent-workflows.md), [subagent-workflows](references/subagent-workflows.md), [command-examples](references/command-examples.md), [learn-pathways](references/learn-pathways.md) (intent taxonomy, game tracks, source handling)
 
 **Internals:** [review-hook-schema](references/review-hook-schema.md), [compiler-internals](references/compiler-internals.md) (attributes, specialization, pipeline)
+
+<!-- lean4-paper-workflow-addon:start -->
+
+## Paper-scale formalization add-on
+
+For a whole paper that will span fresh context windows, use the optional durable workflow layer:
+
+`/lean4:paper-grill` → `/lean4:paper-to-spec` → `/lean4:paper-to-tickets` →
+`/lean4:paper-frontier` → `/lean4:paper-implement` (one ticket per fresh session) →
+`/lean4:paper-final-audit`.
+
+Supporting commands: `/lean4:paper-handoff`, `/lean4:paper-status`, `/lean4:paper-review`,
+and `/lean4:paper-sync`.
+
+This layer does **not** replace `prove`, `autoprove`, `formalize`, `disprove`, `review`, or
+`checkpoint`; `paper-implement` delegates theorem-level work to those existing workflows.
+Durable planning truth is under `.formalization/`; GitHub Issues are a tracker projection.
+See [paper-workflow.md](references/paper-workflow.md).
+
+<!-- lean4-paper-workflow-addon:end -->

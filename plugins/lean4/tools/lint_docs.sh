@@ -19,7 +19,7 @@ PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ISSUES=0
 
 # Single source of truth for known commands (used by check_commands and check_cross_refs)
-KNOWN_COMMANDS="autoformalize autoprove checkpoint diagnose disprove draft formalize golf learn prove refactor review"
+KNOWN_COMMANDS="autoformalize autoprove checkpoint diagnose disprove draft formalize golf learn paper-final-audit paper-frontier paper-grill paper-handoff paper-implement paper-review paper-status paper-sync paper-to-spec paper-to-tickets prove refactor review"
 
 log() {
     echo "$1"

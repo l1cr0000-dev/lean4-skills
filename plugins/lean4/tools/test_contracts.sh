@@ -587,7 +587,7 @@ fi
 
 # ---------------------------------------------------------------------------
 # Check 28: every wrapper's parsed delegation target exists and is
-# executable. Check 27 parses the `lib/scripts/<basename>` delegation to
+# executable where it is itself directly executed. Check 27 parses the `lib/scripts/<basename>` delegation to
 # build its doc-drift mapping but silently skips a wrapper whose body
 # doesn't parse, and never verifies the target file — so a wrapper could
 # ship pointing at a renamed or deleted script and only fail at runtime.
@@ -602,20 +602,20 @@ if [[ -d "$BIN_DIR" ]]; then
         # malformed exec line); `|| true` so a no-match reaches the
         # explicit failure below instead of tripping set -euo pipefail.
         script=$(grep -E '^exec ' "$wrapper" 2>/dev/null \
-            | grep -oE 'lib/scripts/[a-zA-Z0-9_-]+\.(py|sh)' \
+            | grep -oE 'lib/(scripts/)?[a-zA-Z0-9_-]+\.(py|sh)' \
             | tail -1 \
-            | sed 's|lib/scripts/||' || true)
+            | sed 's|lib/||' || true)
         if [[ -z "$script" ]]; then
-            fail "Check 28: wrapper $name has no parseable exec-line lib/scripts/<basename> delegation"
+            fail "Check 28: wrapper $name has no parseable exec-line lib/<basename> delegation"
             check28_ok=0
             continue
         fi
-        target="$PLUGIN_ROOT/lib/scripts/$script"
+        target="$PLUGIN_ROOT/lib/$script"
         if [[ ! -f "$target" ]]; then
-            fail "Check 28: wrapper $name delegates to missing script lib/scripts/$script"
+            fail "Check 28: wrapper $name delegates to missing script lib/$script"
             check28_ok=0
-        elif [[ ! -x "$target" ]]; then
-            fail "Check 28: wrapper $name delegates to non-executable script lib/scripts/$script"
+        elif [[ "$script" == scripts/* && ! -x "$target" ]]; then
+            fail "Check 28: wrapper $name delegates to non-executable script lib/$script"
             check28_ok=0
         fi
     done < <(find "$BIN_DIR" -mindepth 1 -maxdepth 1 -name 'lean4-skills-*' -type f 2>/dev/null | sort)
