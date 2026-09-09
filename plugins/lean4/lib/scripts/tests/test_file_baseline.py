@@ -246,7 +246,9 @@ class FileBaselineTests(unittest.TestCase):
             f.write("\n-- advanced")
         code, out, err = run(["advance", "--baseline", "-", stored], stdin=base)
         self.assertEqual(code, 0, err)
-        self.assertEqual(json.loads(out)["files"][0]["path"], os.path.realpath(real_file))
+        self.assertEqual(
+            json.loads(out)["files"][0]["path"], os.path.realpath(real_file)
+        )
 
     def test_dangling_symlink_retarget_is_drift(self) -> None:
         # Dangling A -> dangling B: both absent, but the resolved identity
