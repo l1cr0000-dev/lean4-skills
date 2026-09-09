@@ -80,6 +80,18 @@ python3 <plugin-root>/lib/paper_architecture.py bind-ticket T-042 \
 ```
 Run this acceptance command from the Lean project root so its imports resolve against intended build artifacts.
 
+After the Ticket DAG is readable and approved, export a Markdown view with one
+file per ticket plus an index:
+
+```bash
+lean4-skills-paper-workflow render-tickets
+```
+
+This writes `.formalization/generated/tickets/README.md` and
+`.formalization/generated/tickets/<ticket-id>.md`. The JSON files under
+`.formalization/` remain authoritative; regenerate the Markdown view after
+changing the ticket graph.
+
 Mutating tickets require owned files. Non-research formal tickets require
 executable acceptance commands. Research tickets may investigate but may not
 complete formal proof obligations.

@@ -12,6 +12,9 @@ collaboration projection.
 
 ## Usage
 
+Ticket creation and GitHub publication are separate actions. `paper-to-tickets`
+updates local durable state only; it does not create Issues automatically.
+
 ## Actions
 
 Never publish a newly generated ticket breakdown without explicit user approval.
@@ -21,6 +24,11 @@ After approval:
 lean4-skills-paper-workflow github-sync \
   --repo owner/repo --spec --tickets --approved
 ```
+
+If the command reports that nothing was published, check that you selected
+`--spec` and/or `--tickets`, that tickets are not still `draft`, and that the
+local `github.issue_number` fields are not already populated. The command
+records each successful Issue mapping back into `.formalization/`.
 
 The helper creates blockers first and uses GitHub CLI native `--parent` and
 `--blocked-by` relationships when the installed version exposes those flags.

@@ -385,6 +385,16 @@ A mutating approved contract must own files. A non-research approved contract mu
 have an executable acceptance command. This turns “work on Proposition 4.2” into
 a verifiable proof contract rather than a vague session goal.
 
+For human-readable planning, export the Ticket DAG as Markdown:
+
+```bash
+lean4-skills-paper-workflow render-tickets
+```
+
+This creates `.formalization/generated/tickets/README.md` plus one Markdown file
+per ticket. It is a projection for reading and review; `.formalization/*.json`
+remains authoritative.
+
 ## File ownership and optional parallelism
 
 Default execution remains one fresh context per ticket. For larger projects,

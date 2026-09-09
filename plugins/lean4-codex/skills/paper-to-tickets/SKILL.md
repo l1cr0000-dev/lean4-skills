@@ -19,3 +19,13 @@ python3 plugins/lean4/lib/paper_architecture.py status
 
 Create approved ticket contracts before implementation. Do not jump from a
 paper section directly to proof work, and do not add adapter-local wrappers.
+
+To make the split easy to read, export one Markdown file per ticket and an
+index after the DAG is in shape:
+
+```bash
+python3 plugins/lean4/lib/paper_workflow.py render-tickets
+```
+
+The output is `.formalization/generated/tickets/README.md` plus one
+`.md` file per ticket. The JSON state remains authoritative.

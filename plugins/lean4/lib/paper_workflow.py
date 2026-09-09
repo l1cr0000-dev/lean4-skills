@@ -1042,6 +1042,89 @@ def cmd_render_ticket(store: Store, args: argparse.Namespace) -> None:
         print(text, end="")
 
 
+def ticket_markdown_filename(ticket_id: str) -> str:
+    safe = "".join(
+        character if character.isalnum() or character in ".-_" else "-"
+        for character in ticket_id
+    ).strip("-.")
+    return f"{safe or 'ticket'}.md"
+
+
+def markdown_cell(value: object) -> str:
+    return str(value).replace("|", "\\|").replace("\n", " ").strip()
+
+
+def render_ticket_index(
+    store: Store,
+    ordered_tickets: list[dict[str, Any]],
+    filenames: dict[str, str],
+) -> str:
+    project = store.project()
+    lines = [
+        "# Paper Ticket Breakdown",
+        "",
+        f"**Project:** {project.get('title', 'Untitled paper')}",
+        "",
+        "This directory is a readable Markdown projection of the durable Ticket DAG.",
+        "The authoritative state remains `.formalization/tickets.json`; regenerate this",
+        "view after changing tickets.",
+        "",
+        "| Order | Ticket | Status | Kind | Blocked by | Claims |",
+        "| ---: | --- | --- | --- | --- | --- |",
+    ]
+    for order, ticket in enumerate(ordered_tickets, start=1):
+        ticket_id = ticket["id"]
+        blockers = ", ".join(ticket.get("blocked_by", [])) or "—"
+        claims = ", ".join(ticket.get("claim_ids", [])) or "—"
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    str(order),
+                    f"[{markdown_cell(ticket_id)}]({filenames[ticket_id]})",
+                    markdown_cell(ticket.get("status", "")),
+                    markdown_cell(ticket.get("kind", "")),
+                    markdown_cell(blockers),
+                    markdown_cell(claims),
+                ]
+            )
+            + " |"
+        )
+    if not ordered_tickets:
+        lines.extend(["", "_No tickets have been created yet._"])
+    return "\n".join(lines) + "\n"
+
+
+def cmd_render_tickets(store: Store, args: argparse.Namespace) -> None:
+    errors = validate(store)
+    if errors:
+        raise WorkflowError(
+            "cannot render invalid workflow state:\n- " + "\n- ".join(errors)
+        )
+    tickets = by_id(store.tickets(), "ticket")
+    ordered_ids = topo_order(tickets, "blocked_by")
+    ordered_tickets = [tickets[ticket_id] for ticket_id in ordered_ids]
+    filenames = {
+        ticket_id: ticket_markdown_filename(ticket_id) for ticket_id in tickets
+    }
+    if len(set(filenames.values())) != len(filenames):
+        raise WorkflowError("ticket IDs collide after Markdown filename sanitization")
+
+    output_dir = Path(args.out_dir) if args.out_dir else store.generated_dir / "tickets"
+    if not output_dir.is_absolute():
+        output_dir = store.root / output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for ticket in ordered_tickets:
+        atomic_write_text(
+            output_dir / filenames[ticket["id"]], render_ticket_body(store, ticket)
+        )
+    index_path = output_dir / "README.md"
+    atomic_write_text(
+        index_path, render_ticket_index(store, ordered_tickets, filenames)
+    )
+    print(index_path)
+
+
 def validate(store: Store) -> list[str]:
     errors: list[str] = []
     try:
@@ -1315,7 +1398,10 @@ def parse_issue_url(output: str) -> tuple[int, str]:
 
 def cmd_github_sync(store: Store, args: argparse.Namespace) -> None:
     if not args.approved:
-        raise WorkflowError("refusing tracker publication without explicit --approved")
+        raise WorkflowError(
+            "refusing tracker publication without explicit --approved; "
+            "re-run with --approved and select --spec and/or --tickets"
+        )
     errors = validate(store)
     if errors:
         raise WorkflowError(
@@ -1343,20 +1429,36 @@ def cmd_github_sync(store: Store, args: argparse.Namespace) -> None:
         project["updated_at"] = now_iso()
         atomic_write_json(store.project_path, project)
         print(f"spec #{number}: {url}")
+    elif args.spec:
+        print(f"spec already mapped: #{spec['github_issue']}")
 
     if not args.tickets:
+        if not args.spec:
+            print("nothing to publish: select --spec and/or --tickets")
+        project["updated_at"] = now_iso()
+        atomic_write_json(store.project_path, project)
         return
     tickets = store.tickets()
     index = by_id(tickets, "ticket")
+    if not tickets:
+        print("tickets: no tickets available to publish")
+        project["updated_at"] = now_iso()
+        atomic_write_json(store.project_path, project)
+        return
     parent_supported = gh_has_flag(["issue", "create"], "--parent")
     blockers_supported = gh_has_flag(["issue", "create"], "--blocked-by")
     project["tracker"]["native_dependencies"] = blockers_supported
     order = topo_order(index, "blocked_by")
+    published_tickets: list[str] = []
+    skipped_drafts = 0
+    skipped_mapped = 0
     for ticket_id in order:
         ticket = index[ticket_id]
         if ticket["status"] == "draft" and not args.include_drafts:
+            skipped_drafts += 1
             continue
         if ticket["github"].get("issue_number") is not None:
+            skipped_mapped += 1
             continue
         body = render_ticket_body(store, ticket)
         cmd = [
@@ -1392,7 +1494,15 @@ def cmd_github_sync(store: Store, args: argparse.Namespace) -> None:
         }
         ticket["updated_at"] = now_iso()
         atomic_write_json(store.tickets_path, tickets)
+        published_tickets.append(ticket_id)
         print(f"{ticket_id} -> #{number}: {url}")
+    if published_tickets:
+        print(f"tickets: published {len(published_tickets)} new issue(s)")
+    else:
+        print(
+            "tickets: no new issues published "
+            f"(drafts skipped: {skipped_drafts}; already mapped: {skipped_mapped})"
+        )
     project["updated_at"] = now_iso()
     atomic_write_json(store.project_path, project)
 
@@ -1650,6 +1760,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("--out")
     p.set_defaults(func=cmd_render_ticket)
+
+    p = sub.add_parser("render-tickets")
+    p.add_argument("--out-dir")
+    p.set_defaults(func=cmd_render_tickets)
 
     p = sub.add_parser("status")
     p.set_defaults(func=cmd_status)
