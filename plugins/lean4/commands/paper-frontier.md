@@ -1,61 +1,77 @@
 ---
 name: paper-frontier
-description: Compute paper-formalization tickets that are actually ready for a fresh session
+description: Compute contracted paper-formalization tickets that are actually ready for a fresh session
 user_invocable: true
 ---
 
 # Lean4 Paper Frontier
 
-Read durable state; do not infer readiness from memory or from issue ordering.
+Read durable state; do not infer readiness from memory, issue ordering, or a
+previous conversation.
 
 ## Usage
+
+Run both validation layers:
 
 ```bash
 lean4-skills-paper-workflow validate
 lean4-skills-paper-workflow frontier
+python3 <plugin-root>/lib/paper_architecture.py validate
+python3 <plugin-root>/lib/paper_architecture.py status
+```
+
+For any proposed ticket, run the stronger architecture gate:
+
+```bash
+python3 <plugin-root>/lib/paper_architecture.py check-ticket T-042
 ```
 
 ## Actions
 
-A ticket is ready only when all ticket blockers are closed and all
-`requires_claims` are verified. Present each ready ticket's objective, linked
-claims, GitHub mapping, and advisory estimate before selecting work.
+A ticket is actually runnable only when it passes **both** layers:
 
-Present the ready tickets with objective, linked paper claims, GitHub issue mapping,
-and estimated size. If exactly one ticket is ready, recommend its full reference
-(e.g. `owner/repo#123` or stable local ID `T-042`) for `/lean4:paper-implement`.
+1. base Ticket DAG says it is `ready` or resumable `partial`;
+2. every base `blocked_by` ticket is closed;
+3. every base `requires_claims` claim is verified;
+4. it has an approved architecture contract;
+5. required statement locks are current;
+6. dependency coverage is complete for the active Paper Claim closure;
+7. every linked obligation belongs to the active verification stage;
+8. every obligation dependency outside this ticket is satisfied;
+9. no linked obligation is blocked or rejected;
+10. mutating ownership and executable acceptance requirements are met.
+
+Present each runnable ticket with objective, linked claims, linked obligations,
+worker type, risk, owned files, GitHub mapping, and advisory size. Recommend one
+full reference when exactly one ticket is ready.
+
+For a large project, you may also inspect:
+
+```bash
+python3 <plugin-root>/lib/paper_architecture.py parallel-frontier
+```
+
+This returns conflict-free advisory batches using file ownership. It does not
+start agents, create worktrees, or authorize concurrent writes.
 
 ## Safety
 
-Do not start work automatically. A GitHub issue's open or closed state does not
-override `tickets.json`; reconcile contradictory tracker state through planning.
+Do not start work automatically. A GitHub issue's state never overrides local
+manifests. Do not make a ticket runnable by deleting a blocker, silently approving
+a contract, changing a statement, or marking an obligation satisfied without
+evidence.
+
+Parallel execution is optional. The default remains one fresh context per ticket.
+If parallelism is used, use separate worktrees/processes and preserve one-writer
+ownership for each file.
 
 ## See Also
 
-Use `/lean4:paper-status` for the complete durable-state summary. Once a user
-selects a frontier ticket, continue with `/lean4:paper-implement`.
+Use `/lean4:paper-status` for the combined project state. Once a user selects a
+runnable ticket, continue with `/lean4:paper-implement`.
 
-The frontier is an execution query over the Ticket DAG, not a mathematical
-topological sort. A ticket can mention several claims while waiting on only the
-specific verified claims that it needs to begin.
+If the frontier is empty, report which dependency scans, base blockers, claims,
+obligation edges, statement locks, stage boundaries, or contract requirements prevent progress. Planning defects go
+back to `paper-to-tickets`; mathematical blockers remain explicit obligations.
 
-If the result is empty, explain which ticket blockers or mathematical claim
-requirements are preventing progress. Do not manufacture a ready ticket by
-changing its status or deleting a dependency edge.
-
-If several tickets are ready, present them as independent choices. Let the user
-choose the next scope, then start a fresh context for its implementation.
-
-Before proposing a ticket, confirm that its acceptance criteria are still
-meaningful and that no changed statement fingerprint has invalidated its plan.
-Use a planning review when the remaining work does not fit the existing ticket
-edges.
-
-Frontier output is safe to recompute at any time. It changes only when durable
-claim or ticket state changes, never because the current conversation has more
-or less context remaining.
-
-The command never edits state. It only makes the existing execution constraints
-visible for selection and handoff.
-
-It is therefore safe to use at every planning boundary.
+Frontier computation is read-only and safe to rerun at every session boundary.

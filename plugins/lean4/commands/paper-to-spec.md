@@ -1,85 +1,109 @@
 ---
 name: paper-to-spec
-description: Synthesize a durable formalization spec and macro paper-claim DAG from resolved grill decisions
+description: Freeze the paper source/target/trust boundary and synthesize the macro Paper Claim DAG
 user_invocable: true
 argument-hint: '[--publish-github]'
 ---
 
 # Lean4 Paper To Spec
 
-This is a **synthesis** workflow. It records decisions already made; it does not
-start a new interview.
+This is a synthesis workflow. It records settled mathematical intent; it does not
+start proving or assign implementation work.
 
 Read [paper-workflow.md](../skills/lean4/references/paper-workflow.md).
 
 ## Usage
-
-Run:
 
 ```bash
 lean4-skills-paper-workflow validate
 lean4-skills-paper-workflow grill-check
 ```
 
-If grill readiness is false, route back to `/lean4:paper-grill`. Do not invent
-missing policy just to fill the spec.
+If grill readiness is false, return to `/lean4:paper-grill`. Never invent missing
+scope/trust policy just to complete the spec.
 
 ## Actions
 
-1. Read the durable decisions, `.formalization/CONTEXT.md`, paper source, and relevant Lean repo context.
-2. Extract the **macro Paper Claim DAG**: stable IDs for paper definitions/lemmas/propositions/theorems in the selected verification boundary. Do not explode every proof into Lean helper lemmas yet.
-3. Register approved external premises separately with `add-assumption`; never encode a paper-original claim as an assumption.
-4. Add claims with source locators and mathematical `depends_on` edges.
-5. Set target claim IDs with `set-targets`.
-6. Write `FORMALIZATION_SPEC.md` containing at least:
-   - goal and target theorem(s),
-   - verification boundary and out-of-scope,
-   - trust boundary with every approved premise class,
-   - source/provenance rules,
-   - Paper Claim DAG summary,
-   - statement-lock/revision policy,
-   - ticket-sizing and handoff policy,
-   - verification/final-audit criteria,
-   - unresolved source ambiguities, if any.
+1. Read durable decisions, `.formalization/CONTEXT.md`, the paper source, and
+   relevant Lean repository context.
+2. Freeze the paper source fingerprint and the exact external target: quantifiers,
+   hypotheses, conclusion, domain, and selected main theorem(s). Architecture `init`
+   safely fills a missing base-v2 source SHA; it never replaces a mismatch silently.
+3. Extract the macro **Paper Claim DAG** with stable IDs for paper definitions,
+   lemmas, propositions, theorems, and corollaries in the selected boundary.
+4. Register approved external premises separately with `add-assumption`; never
+   encode a paper-original result as an assumption.
+5. Add source locators, `depends_on`, `uses_assumptions`, Lean statement mappings,
+   and selected target IDs.
+6. Write `FORMALIZATION_SPEC.md` containing scope, out-of-scope material, trust
+   boundary, source/provenance rules, Claim DAG summary, statement-lock policy,
+   architecture policy, comparator policy, ticket/ownership/handoff rules, and
+   final completion criteria.
 7. Record the spec fingerprint:
 
 ```bash
 lean4-skills-paper-workflow record-spec --path FORMALIZATION_SPEC.md
 ```
 
-If source interpretation exposes a real decision not covered by grill, do not
-silently choose. Record the ambiguity and return to `paper-grill` for that one
-decision, then resume spec synthesis.
-
-If macro claim extraction itself reaches a context boundary, persist a planning
-handoff before stopping:
+Initialize and configure the architecture companion:
 
 ```bash
-lean4-skills-paper-workflow planning-handoff \
-  --reason context-boundary \
-  --completed "mapped sections 1-3" \
-  --remaining "map section 4 and main theorem closure" \
-  --next-action "resume claim extraction from section 4"
+python3 <plugin-root>/lib/paper_architecture.py init
+# init freezes a missing base-v2 project.source.sha256 from the current paper bytes
+python3 <plugin-root>/lib/paper_architecture.py configure-verification \
+  --primary-target P-MAIN \
+  --full-paper-policy skip
 ```
+
+Set `full_paper_policy` from the durable grill decision:
+
+- `skip` — main-theorem closure is the final scope;
+- `after-main` — continue to full-paper verification only after Stage 1 passes;
+- `ask` — pause after Stage 1 and ask the user.
+
+Before any proof ticket becomes executable, perform a second-pass **Dependency
+Coverage Audit** over every claim in the active closure. For each claim, scan its
+actual proof text/references and record the reconciled result:
+
+```bash
+python3 <plugin-root>/lib/paper_architecture.py record-dependency-scan \
+  --claim P-MAIN \
+  --source-ref "paper §1, proof of Theorem 1.1" \
+  --internal-claim P-PROP-3.1 \
+  --assumption A-EXT-01 \
+  --complete
+```
+
+The recorded internal claims and assumptions must exactly match the Claim DAG. If
+the scan discovers an omitted dependency, revise the DAG first and repeat the
+scan. This prevents a formally clean but source-incomplete main-theorem closure.
+
+The next workflow is `/lean4:paper-to-tickets`, which derives Formal Obligations
+before creating execution tickets. Do not jump from paper sections directly to
+implementation tickets.
+
+If source interpretation exposes a real unresolved decision, persist it and route
+back to `paper-grill`. If planning crosses a context boundary, write a durable
+planning handoff rather than relying on chat memory.
 
 ## GitHub
 
-Local spec is authoritative. Publish only after explicit user approval:
+Local spec/state is authoritative. Publish only after explicit approval:
 
 ```bash
 lean4-skills-paper-workflow github-sync --repo owner/repo --spec --approved
 ```
 
-Do not start implementation from the parent spec. Next step for multi-session
-work is `/lean4:paper-to-tickets`.
-
 ## Safety
 
-The spec records planning decisions; it does not authorize replacing a
-paper-original result with an assumption or changing a locked statement. Keep
-the Paper Claim DAG mathematical and leave execution dependencies to tickets.
+Do not weaken the target, change the trust boundary, or hide a paper-original
+claim as an external premise. Do not mark dependency coverage complete from a
+summary alone; inspect the source proof and reconcile every discovered reference.
+
+The Claim DAG records mathematical dependency; Formal Obligations record Lean
+proof responsibility; Tickets record execution dependency.
 
 ## See Also
 
-Use `/lean4:paper-grill` for unresolved policy decisions, then
-`/lean4:paper-to-tickets` to derive the independent Ticket DAG.
+Use `/lean4:paper-grill` for unresolved decisions and
+`/lean4:paper-to-tickets` after source/target/claim planning is frozen.

@@ -1,6 +1,6 @@
 ---
 name: paper-review
-description: Read-only audit of paper-level scope, trust boundary, claim DAG, ticket DAG, statement locks, and handoffs
+description: Read-only audit of scope, dependency coverage, three DAGs, machine evidence, trust, and comparators
 user_invocable: true
 argument-hint: '[--scope=project|claim|ticket]'
 ---
@@ -8,53 +8,57 @@ argument-hint: '[--scope=project|claim|ticket]'
 # Lean4 Paper Review
 
 This is read-only. It complements `/lean4:review`, which focuses on Lean proof
-quality.
+quality rather than paper-scale orchestration.
 
 ## Usage
 
-Read [paper-workflow.md](../skills/lean4/references/paper-workflow.md), then run
-`lean4-skills-paper-workflow validate`.
+Read [paper-workflow.md](../skills/lean4/references/paper-workflow.md), then run:
+
+```bash
+lean4-skills-paper-workflow validate
+python3 <plugin-root>/lib/paper_architecture.py validate
+python3 <plugin-root>/lib/paper_architecture.py verification-gate --format json
+```
 
 ## Actions
 
 Audit for:
 
-1. target theorem and transitive Paper Claim closure match the stated scope;
-2. no paper-original claim appears in `assumptions.json`;
-3. every trusted external premise has provenance and explicit approval;
-4. claim DAG has no missing or circular edges;
-5. locked statements have Lean mapping + fingerprint;
-6. no `verified` claim lacks build/sorry/axiom evidence;
-7. ticket DAG is execution-oriented and not confused with the claim DAG;
-8. tickets are fresh-context executable and not obviously oversized;
-9. acceptance criteria can fail and are owned by that ticket;
-10. blocked/partial tickets have useful handoffs;
-11. GitHub issue mapping does not override contradictory local state.
+1. active scope matches `project.targets`, and Stage 1 has no mixed Stage-2 ticket;
+2. `full_paper_policy` is explicit and promotion history is coherent;
+3. target theorem and transitive Paper Claim closure match the selected scope;
+4. every active claim has a completed, source-fingerprint-bound dependency scan;
+5. each scan exactly matches Claim DAG edges and registered assumptions;
+6. no paper-original claim appears in `assumptions.json`;
+7. trusted external premises have provenance and approval;
+8. every target-closure claim has Formal Obligation coverage;
+9. obligation dependencies are acyclic and satisfied nodes have satisfied deps;
+10. each implementation ticket has one approved contract and clear ownership;
+11. research contracts do not complete formal obligations;
+12. acceptance commands genuinely exercise the intended Lean verification;
+13. satisfied obligations have untampered machine evidence tied to closed tickets;
+14. evidence contract/source hashes are still current;
+15. locked statements have Lean mappings/fingerprints;
+16. required independent comparators are independent and machine verified;
+17. GitHub state does not contradict authoritative local state.
 
-When reviewing one claim or ticket, include its direct dependencies and direct
-reverse dependents so an apparent local change is evaluated for downstream impact.
+When reviewing one claim, include source dependency coverage, direct claim deps,
+obligation coverage, and downstream assembly/bridge obligations. For one ticket,
+include stage membership, contract, ownership, external obligation deps, acceptance
+commands, and evidence freshness.
 
 ## Safety
 
-Report defects without repairing planning state, statements, tickets, or GitHub
-issues. Route concrete repairs to the responsible paper command after review.
+Report defects without mutating claims, scans, obligations, tickets, contracts,
+comparators, or GitHub issues. Route repairs to the responsible workflow.
+
+Do not demand a comparator when the spec marks it optional. Do not reclassify a
+paper theorem as external to make an audit green. Do not accept a manually written
+`passed` value in place of machine command evidence.
+
+For trust findings, name the exact result class and external premise IDs.
 
 ## See Also
 
 Use `/lean4:review` for Lean proof-quality review and `/lean4:paper-final-audit`
-to compute the project-level closure and trust result.
-
-Review findings should name the durable record, affected IDs, observed evidence,
-and recommended next action. This gives a later planning session enough detail
-to resolve the issue without relying on the reviewer conversation.
-
-When the review finds a source ambiguity, distinguish it from a proof failure:
-the former reopens a planning decision, while the latter belongs to a ticket.
-
-For trust-boundary findings, identify the category (`foundation`, `mathlib`,
-`formal_import`, or `trusted_external`) and whether the premise is approved.
-Never label a paper-original theorem as external merely to make the audit pass.
-Record the required correction in a follow-up planning or implementation ticket.
-
-Keep the report scoped to observed repository state and cite its record paths.
-This helps a later reviewer reproduce both the finding and its resolution.
+for the completion gate.

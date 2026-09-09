@@ -367,6 +367,45 @@ class PaperWorkflowTest(unittest.TestCase):
         out, _ = self.run_cli("frontier")
         self.assertEqual([item["id"] for item in json.loads(out)], ["T-D"])
 
+    def test_render_tickets_exports_readable_markdown_breakdown(self) -> None:
+        self.run_cli(
+            "add-ticket",
+            "--id",
+            "T-ROOT",
+            "--title",
+            "Root task",
+            "--objective",
+            "Establish the reusable lemma.",
+            "--accept",
+            "lake env lean Root.lean",
+        )
+        self.run_cli(
+            "add-ticket",
+            "--id",
+            "T-ASSEMBLY",
+            "--title",
+            "Assembly task",
+            "--objective",
+            "Assemble the main result.",
+            "--blocked-by",
+            "T-ROOT",
+            "--accept",
+            "lake env lean Main.lean",
+        )
+
+        out, _ = self.run_cli("render-tickets")
+        output_dir = self.root / ".formalization" / "generated" / "tickets"
+        self.assertEqual(
+            Path(out.strip()).resolve(), (output_dir / "README.md").resolve()
+        )
+        index = (output_dir / "README.md").read_text(encoding="utf-8")
+        root_ticket = (output_dir / "T-ROOT.md").read_text(encoding="utf-8")
+        assembly_ticket = (output_dir / "T-ASSEMBLY.md").read_text(encoding="utf-8")
+        self.assertIn("[T-ROOT](T-ROOT.md)", index)
+        self.assertIn("[T-ASSEMBLY](T-ASSEMBLY.md)", index)
+        self.assertIn("Establish the reusable lemma.", root_ticket)
+        self.assertIn("`T-ROOT`", assembly_ticket)
+
     def test_open_related_ticket_keeps_final_audit_incomplete(self) -> None:
         self.add_claim("P-MAIN")
         self.lock_claim("P-MAIN")
@@ -451,6 +490,50 @@ class PaperWorkflowTest(unittest.TestCase):
 
     def test_github_publication_requires_explicit_approval(self) -> None:
         self.run_cli("github-sync", "--repo", "owner/repo", "--tickets", expect=2)
+
+    def test_github_sync_explains_when_no_publication_scope_is_selected(self) -> None:
+        out, _ = self.run_cli("github-sync", "--repo", "owner/repo", "--approved")
+        self.assertIn("nothing to publish", out)
+
+    def test_github_sync_records_issue_mapping_for_new_ticket(self) -> None:
+        self.run_cli(
+            "add-ticket",
+            "--id",
+            "T-1",
+            "--title",
+            "Publishable ticket",
+            "--objective",
+            "Publish this ticket.",
+            "--accept",
+            "done",
+        )
+        calls: list[list[str]] = []
+        original_gh_run = paper_workflow.gh_run
+
+        def fake_gh_run(args: list[str], *, input_text: str | None = None) -> str:
+            del input_text
+            calls.append(args)
+            if args[-1] == "--help":
+                return "--parent\n--blocked-by"
+            return "https://github.com/owner/repo/issues/123"
+
+        paper_workflow.gh_run = fake_gh_run
+        try:
+            out, _ = self.run_cli(
+                "github-sync",
+                "--repo",
+                "owner/repo",
+                "--tickets",
+                "--approved",
+            )
+        finally:
+            paper_workflow.gh_run = original_gh_run
+
+        self.assertIn("T-1 -> #123", out)
+        self.assertIn("published 1 new issue", out)
+        ticket = self.json_file("tickets.json")[0]
+        self.assertEqual(ticket["github"]["issue_number"], 123)
+        self.assertEqual(len(calls), 3)
 
     def test_planning_handoff_is_persisted(self) -> None:
         out, _ = self.run_cli(

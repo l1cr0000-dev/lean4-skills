@@ -1,14 +1,14 @@
 ---
 name: paper-to-tickets
-description: Split a formalization spec into one-fresh-context Lean tickets with explicit blocking edges
+description: Derive formal obligations, then split them into fresh-context Lean ticket contracts
 user_invocable: true
 argument-hint: '[--publish-github]'
 ---
 
 # Lean4 Paper To Tickets
 
-Turn the settled spec into the **Ticket DAG**. The Paper Claim DAG remains a
-separate mathematical artifact.
+Turn the settled spec into two separate planning artifacts: the **Formal
+Obligation DAG** and the **Ticket DAG**. The Paper Claim DAG remains separate.
 
 Read [paper-workflow.md](../skills/lean4/references/paper-workflow.md).
 
@@ -17,90 +17,104 @@ Read [paper-workflow.md](../skills/lean4/references/paper-workflow.md).
 ```bash
 lean4-skills-paper-workflow validate
 lean4-skills-paper-workflow check-spec
+python3 <plugin-root>/lib/paper_architecture.py init
+python3 <plugin-root>/lib/paper_architecture.py status
 ```
-
+Before implementation planning, the active claim closure must have completed
+source dependency scans. For each claim, record the proof references found in the
+paper and reconcile them with `depends_on` / `uses_assumptions`:
+```bash
+python3 <plugin-root>/lib/paper_architecture.py record-dependency-scan \
+  --claim P-MAIN \
+  --source-ref "paper §1, Theorem 1.1 proof" \
+  --internal-claim P-PROP-3.1 \
+  --assumption A-MATHLIB-X \
+  --complete
+```
+If the scan finds a missing dependency, update the Claim DAG first. Do not mark a
+mismatched scan complete.
 ## Actions
 
-A ticket must be executable by a fresh session that has never seen the earlier
-conversation. Prefer one narrow, verifiable mathematical/proof path over a
-horizontal phase such as "formalize all definitions" or "prove all estimates".
+During `main-theorem`, create work only for the active main-theorem transitive
+closure. `skip` is terminal after Stage 1; `ask` pauses for the user's choice;
+`after-main` permits Stage-2 planning only after `promote-full-paper` succeeds.
 
-Lean-specific useful ticket shapes include:
+### Stage A — Formal Obligation DAG
 
-- formalize and lock one substantial paper statement plus its local definitions;
-- prove one hard helper needed by a paper claim;
-- close one estimate cluster whose dependencies are already verified;
-- assemble already-proved helpers into a paper claim;
-- perform a dedicated axiom/sorry/integration audit.
+Prefer proof-responsibility boundaries over paper sections. Useful kinds include:
 
-Do not force `one paper claim = one ticket`. One claim may need many tickets.
+- `statement` / `definition_data`;
+- `generic_lemma` / `arithmetic_ledger`;
+- `analytic_estimate` / `regularity_support`;
+- `coherence_invariant` / `actual_instance`;
+- `assembly` / `comparator_bridge` / `audit`.
 
-## Sizing
+A preferred shape is:
 
-Default advisory budget is ~140k tokens for a 220k nominal window, with a soft
-handoff around ~175k. Do not treat these as exact counters. Split earlier when a
-ticket contains multiple independent hard unknowns.
-
-## Approval gate
-
-Before publishing anything:
-
-1. persist the proposed breakdown locally as `--draft` tickets so it survives a context boundary;
-2. present the numbered ticket plan to the user;
-3. for every ticket show title, objective, claim IDs, blockers, and rough size;
-4. explicitly ask whether to merge/split/reorder or change blockers;
-5. after approval, promote the accepted drafts with `approve-tickets`;
-6. publish only after approval.
-
-Create blockers-first. Acceptance criteria must be observations that can fail at the starting state.
-
-Example:
-
-```bash
-lean4-skills-paper-workflow add-ticket \
-  --id T-042 \
-  --title "Prove coercivity helper for P-PROP-014" \
-  --kind prove \
-  --objective "Prove the weighted coercivity estimate used in Proposition 4.2" \
-  --claim P-PROP-014 \
-  --requires-claim P-LEM-009 \
-  --blocked-by T-039 \
-  --constraint "Do not modify the locked statement of P-PROP-014" \
-  --accept "helper theorem elaborates with zero sorry" \
-  --accept "affected dependency build passes" \
-  --estimate-tokens 130000 \
-  --draft
+```text
+Spec -> Generic -> Actual -> Assembly -> Bridge -> Audit
 ```
 
-After the user approves the breakdown:
+Use conditional interfaces when useful: prove the consumer from obligations
+`H1...Hn`, then discharge each `Hi` independently. Keep arithmetic ledgers
+separate from hard analysis when this reduces coupling.
+
+Persist obligations as drafts with `add-obligation`, present the DAG, then use
+`approve-obligations`. More than two independent hard unknowns is normally a
+split signal.
+
+### Stage B — Ticket DAG and contracts
+
+Create base tickets as drafts, then bind each implementation ticket to an explicit
+contract:
 
 ```bash
-lean4-skills-paper-workflow approve-tickets --all
+python3 <plugin-root>/lib/paper_architecture.py bind-ticket T-042 \
+  --obligation O-ANA-017 \
+  --completes-obligation O-ANA-017 \
+  --worker autoprove \
+  --owned-file Paper/Estimates.lean \
+  --read-file Paper/Definitions.lean \
+  --accept "lake env lean Paper/Estimates.lean" \
+  --risk high --hard-unknowns 1
 ```
+Run this acceptance command from the Lean project root so its imports resolve against intended build artifacts; use `render-tickets` for a Markdown view and `paper-sync --approved` for explicit GitHub publication.
 
-Validate and inspect frontier:
+Mutating tickets require owned files. Non-research formal tickets require
+executable acceptance commands. Research tickets may investigate but may not
+complete formal proof obligations.
 
-```bash
-lean4-skills-paper-workflow validate
-lean4-skills-paper-workflow frontier
-```
+Do not force one claim = one ticket or one obligation = one ticket. Small coherent
+obligations may share a contract; a difficult obligation may use prerequisite
+research/proof tickets plus one final completion ticket.
 
-After user approval, publish GitHub tickets:
+## Approval
 
-```bash
-lean4-skills-paper-workflow github-sync --repo owner/repo --tickets --approved
-```
+Before implementation:
 
-Native `blocked-by`/parent relationships are used when supported by the installed
-GitHub CLI; local `tickets.json` remains authoritative.
+1. approve the obligation plan;
+2. approve base tickets;
+3. approve architecture contracts;
+4. run both validators;
+5. run `check-ticket` on the intended frontier;
+6. publish GitHub projection only after explicit approval.
+
+The architecture gate refuses proof execution if dependency coverage is missing,
+a ticket mixes inactive-stage obligations, statement locks are missing, external
+obligation dependencies are unsatisfied, or acceptance/ownership is incomplete.
 
 ## Safety
 
-Do not use issue ordering as the dependency graph or collapse a claim into one
-ticket merely for tracker convenience. The context budget is advisory: split
-when the work has multiple independent unknowns.
+Do not use issue order as dependency truth. Do not hide an uncertain estimate in
+“formalize section N”. Do not let parallel tickets write the same owned file.
+
+Acceptance commands are security/trust-critical: they must genuinely exercise the
+Lean checks needed for the contract, not a dummy success command.
+
+A required independent comparator remains separate from the proof root and blocks
+final completion until machine verified.
 
 ## See Also
 
-Use `/lean4:paper-frontier` to select a ready ticket and
-`/lean4:paper-implement` to execute exactly one of them.
+Use `/lean4:paper-frontier` for runnable contracted work and
+`/lean4:paper-implement` to execute exactly one approved contract.

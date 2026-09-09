@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paper Status"
+  short_description: "Show durable paper architecture and workflow state"
+  default_prompt: "Use $paper-status to give an evidence-backed status report for this paper."

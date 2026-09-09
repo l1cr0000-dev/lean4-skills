@@ -1428,6 +1428,8 @@ check_release_metadata() {
     local market_plugin_desc="" market_source="" market_plugin_count=""
     local codex_version="" codex_desc="" codex_name="" codex_skills="" codex_hooks="" codex_semver=""
     local codex_market_name="" codex_market_total="" codex_market_plugin_count="" codex_contribute_count=""
+    local codex_adapter_count="" codex_adapter_source_type="" codex_adapter_source_path=""
+    local codex_adapter_source_in_repo="" codex_adapter_installation="" codex_adapter_authentication="" codex_adapter_category=""
     local codex_source_type="" codex_source_path="" codex_source_in_repo=""
     local codex_installation="" codex_authentication="" codex_category=""
     local key value
@@ -1449,6 +1451,13 @@ check_release_metadata() {
             codex_market_total) codex_market_total="$value" ;;
             codex_market_plugin_count) codex_market_plugin_count="$value" ;;
             codex_contribute_count) codex_contribute_count="$value" ;;
+            codex_adapter_count) codex_adapter_count="$value" ;;
+            codex_adapter_source_type) codex_adapter_source_type="$value" ;;
+            codex_adapter_source_path) codex_adapter_source_path="$value" ;;
+            codex_adapter_source_in_repo) codex_adapter_source_in_repo="$value" ;;
+            codex_adapter_installation) codex_adapter_installation="$value" ;;
+            codex_adapter_authentication) codex_adapter_authentication="$value" ;;
+            codex_adapter_category) codex_adapter_category="$value" ;;
             codex_source_type) codex_source_type="$value" ;;
             codex_source_path) codex_source_path="$value" ;;
             codex_source_in_repo) codex_source_in_repo="$value" ;;
@@ -1480,9 +1489,13 @@ legacy = legacy_plugins[0] if legacy_plugins else {}
 codex_plugins = codex_market.get("plugins", [])
 lean4_entries = [p for p in codex_plugins if p.get("name") == "lean4"]
 contribute_entries = [p for p in codex_plugins if p.get("name") == "lean4-contribute"]
+adapter_entries = [p for p in codex_plugins if p.get("name") == "lean4-codex"]
 entry = lean4_entries[0] if lean4_entries else {}
+adapter_entry = adapter_entries[0] if adapter_entries else {}
 source = entry.get("source") if isinstance(entry.get("source"), dict) else {}
 policy = entry.get("policy") if isinstance(entry.get("policy"), dict) else {}
+adapter_source = adapter_entry.get("source") if isinstance(adapter_entry.get("source"), dict) else {}
+adapter_policy = adapter_entry.get("policy") if isinstance(adapter_entry.get("policy"), dict) else {}
 source_path = source.get("path", "")
 repo_root = Path(repo_path).resolve()
 try:
@@ -1510,12 +1523,27 @@ emit("codex_market_name", codex_market.get("name", ""))
 emit("codex_market_total", len(codex_plugins))
 emit("codex_market_plugin_count", len(lean4_entries))
 emit("codex_contribute_count", len(contribute_entries))
+emit("codex_adapter_count", len(adapter_entries))
 emit("codex_source_type", source.get("source", ""))
 emit("codex_source_path", source_path)
 emit("codex_source_in_repo", "yes" if source_in_repo else "no")
 emit("codex_installation", policy.get("installation", ""))
 emit("codex_authentication", policy.get("authentication", ""))
 emit("codex_category", entry.get("category", ""))
+emit("codex_adapter_source_type", adapter_source.get("source", ""))
+emit("codex_adapter_source_path", adapter_source.get("path", ""))
+try:
+    resolved_adapter_source = (repo_root / adapter_source.get("path", "")).resolve()
+    adapter_source_in_repo = (
+        resolved_adapter_source.is_dir()
+        and (resolved_adapter_source == repo_root or repo_root in resolved_adapter_source.parents)
+    )
+except (OSError, RuntimeError):
+    adapter_source_in_repo = False
+emit("codex_adapter_source_in_repo", "yes" if adapter_source_in_repo else "no")
+emit("codex_adapter_installation", adapter_policy.get("installation", ""))
+emit("codex_adapter_authentication", adapter_policy.get("authentication", ""))
+emit("codex_adapter_category", adapter_entry.get("category", ""))
 PY
 )
 
@@ -1591,10 +1619,11 @@ PY
     else
         warn "unexpected Codex marketplace name: $codex_market_name"
     fi
-    if [[ "$codex_market_total" -eq 1 && "$codex_market_plugin_count" -eq 1 && "$codex_contribute_count" -eq 0 ]]; then
-        ok "Codex marketplace contains only the lean4 plugin"
+    if [[ "$codex_market_total" -eq 2 && "$codex_market_plugin_count" -eq 1 \
+       && "$codex_adapter_count" -eq 1 && "$codex_contribute_count" -eq 0 ]]; then
+        ok "Codex marketplace contains lean4 and the paper adapter only"
     else
-        warn "Codex marketplace must contain exactly one lean4 entry and no lean4-contribute entry"
+        warn "Codex marketplace must contain exactly one lean4 and one lean4-codex entry"
     fi
     if [[ "$codex_source_type" == "local" \
        && "$codex_source_path" == "./plugins/lean4" \
@@ -1612,6 +1641,24 @@ PY
         ok "Codex marketplace category is Coding"
     else
         warn "unexpected Codex marketplace category: $codex_category"
+    fi
+    if [[ "$codex_adapter_source_type" == "local" \
+       && "$codex_adapter_source_path" == "./plugins/lean4-codex" \
+       && "$codex_adapter_source_in_repo" == "yes" ]]; then
+        ok "paper adapter marketplace source is local ./plugins/lean4-codex"
+    else
+        warn "unexpected or out-of-repository paper adapter source: $codex_adapter_source_type $codex_adapter_source_path"
+    fi
+    if [[ "$codex_adapter_installation" == "AVAILABLE" \
+       && "$codex_adapter_authentication" == "ON_INSTALL" ]]; then
+        ok "paper adapter marketplace policy metadata is complete"
+    else
+        warn "unexpected paper adapter marketplace policy: installation=$codex_adapter_installation authentication=$codex_adapter_authentication"
+    fi
+    if [[ "$codex_adapter_category" == "Productivity" ]]; then
+        ok "paper adapter marketplace category is Productivity"
+    else
+        warn "unexpected paper adapter marketplace category: $codex_adapter_category"
     fi
 
     # 7. CHANGELOG entry — exact heading + non-empty section, via the same

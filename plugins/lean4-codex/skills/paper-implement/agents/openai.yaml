@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paper Implement"
+  short_description: "Execute one approved paper ticket contract"
+  default_prompt: "Use $paper-implement to execute ticket T-042 from durable paper state."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paper Sync"
+  short_description: "Project approved paper state to GitHub Issues"
+  default_prompt: "Use $paper-sync to publish approved local paper state to GitHub Issues."

@@ -5,27 +5,49 @@ prove/review/golf loop, mathlib search, axiom checking, and safety guardrails.
 The workflows are host-agnostic — Claude Code, Codex, Gemini CLI, Cursor, and
 others all use the same core skill; only the invocation surface differs.
 
+[简体中文](README.zh-CN.md)
+
+## About This Fork
+
+This repository is a downstream fork of
+[Cameron Freer's lean4-skills](https://github.com/cameronfreer/lean4-skills).
+The upstream project, its contributors, and its original documentation are the
+foundation of this work. This fork preserves the upstream MIT license, copyright
+notice, authorship, and citation information.
+
+In addition to synchronized upstream releases, this fork adds an optional
+paper-scale formalization layer: durable planning state, Paper Claim and Ticket
+DAGs, statement locks, explicit trust-boundary tracking, cross-session handoffs,
+and final audits. It is additive: upstream theorem-level workflows remain
+authoritative and are not replaced.
+
+For the original project, upstream releases, and upstream issues, visit
+[cameronfreer/lean4-skills](https://github.com/cameronfreer/lean4-skills).
+Fork-specific work and issues belong in
+[l1cr0000-dev/lean4-skills](https://github.com/l1cr0000-dev/lean4-skills).
+
 ## Quick Start
 
 | Host | Recommended installation | What you get | Details |
 |---|---|---|---|
 | Claude Code | Native plugin (Tier 3) | Skill + `/lean4:*` commands, hooks, guardrails, subagents, helper runtime | [Claude Code](INSTALLATION.md#claude-code-native-plugin) |
-| Codex | Native plugin (Tier 3) | Skill + trusted hooks + absolute-path helper runtime; no `/lean4:*` parity | [Codex](INSTALLATION.md#openai-codex-cli) |
+| Codex | Native plugins (Tier 3) | Full Lean runtime plus optional friendly paper-skill adapter | [Codex](INSTALLATION.md#openai-codex-cli) |
 | Other Agent Skills hosts (Gemini, Antigravity, Copilot, Cursor, Windsurf, OpenCode, …) | Skill-only quick install | Instructions + references (documented, not CI-verified) | [Installation guide](INSTALLATION.md) |
 | Any host, full runtime | Portable checkout (Tier 2) | Skill + wrappers + helper scripts | [Portable](INSTALLATION.md#portable-checkout--helper-runtime-all-hosts) |
 
 **Claude Code** (run in chat):
 
 ```text
-/plugin marketplace add cameronfreer/lean4-skills
+/plugin marketplace add l1cr0000-dev/lean4-skills
 /plugin install lean4
 ```
 
 **Codex** (in your shell):
 
 ```bash
-codex plugin marketplace add cameronfreer/lean4-skills --ref main
+codex plugin marketplace add l1cr0000-dev/lean4-skills --ref main
 codex plugin add lean4@lean4-skills
+codex plugin add lean4-codex@lean4-skills
 ```
 
 > Host-native skill installers generally provide the instructions and
@@ -85,7 +107,14 @@ The skill works standalone, but pairs best with [lean-lsp-mcp](https://github.co
 
 ## Contributing
 
-Issues and PRs welcome at https://github.com/cameronfreer/lean4-skills. With the `lean4-contribute` plugin installed, your agent may suggest filing bug reports, feature requests, or insights at natural stopping points — drafting starts only after you opt in, and every draft is shown in full before anything is sent.
+For fork-specific work, open issues and pull requests at
+https://github.com/l1cr0000-dev/lean4-skills. Improvements that are broadly
+useful beyond this fork should also be considered for the
+[upstream project](https://github.com/cameronfreer/lean4-skills). With the
+`lean4-contribute` plugin installed, your agent may suggest filing upstream bug
+reports, feature requests, or insights at natural stopping points — drafting
+starts only after you opt in, and every draft is shown in full before anything
+is sent.
 
 ## License & Citation
 
