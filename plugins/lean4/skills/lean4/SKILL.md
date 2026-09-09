@@ -54,15 +54,15 @@ Per-command policy lives in each command's doc. The docstring split applies in e
 | Command | Purpose |
 |---------|---------|
 | `/lean4:paper-grill` | Stateful interview that freezes paper formalization scope, trust boundary, statement policy, and completion criteria |
-| `/lean4:paper-to-spec` | Synthesize a durable formalization spec and macro paper-claim DAG from resolved grill decisions |
-| `/lean4:paper-to-tickets` | Split a formalization spec into one-fresh-context Lean tickets with explicit blocking edges |
-| `/lean4:paper-frontier` | Compute paper-formalization tickets that are actually ready for a fresh session |
-| `/lean4:paper-implement` | Execute exactly one paper-formalization ticket in a fresh context using existing lean4-skills proof engines |
+| `/lean4:paper-to-spec` | Freeze the paper source/target/trust boundary and synthesize the macro Paper Claim DAG |
+| `/lean4:paper-to-tickets` | Derive formal obligations, then split them into fresh-context Lean ticket contracts |
+| `/lean4:paper-frontier` | Compute contracted paper-formalization tickets that are actually ready for a fresh session |
+| `/lean4:paper-implement` | Execute exactly one contracted paper-formalization ticket in a fresh context |
 | `/lean4:paper-handoff` | Persist an unfinished Lean paper ticket so a fresh context can resume without reconstructing history |
-| `/lean4:paper-status` | Show durable paper workflow phase, claim/ticket counts, frontier, and tracker mappings |
-| `/lean4:paper-review` | Read-only audit of paper-level scope, trust boundary, claim DAG, ticket DAG, statement locks, and handoffs |
+| `/lean4:paper-status` | Show combined claim, dependency-coverage, obligation, contract, evidence, comparator, and scope state |
+| `/lean4:paper-review` | Read-only audit of scope, dependency coverage, three DAGs, machine evidence, trust, and comparators |
 | `/lean4:paper-sync` | Explicitly project local paper spec, ticket DAG, ticket completion, or handoff state to GitHub Issues |
-| `/lean4:paper-final-audit` | Compute final trust status for target theorem closure, including trusted external premises and unfinished work |
+| `/lean4:paper-final-audit` | Compute final machine-evidence, trust, and architecture status for the selected target closure |
 
 `/lean4:*` names are the native plugin's command aliases and also serve
 as stable workflow names throughout this documentation. On hosts

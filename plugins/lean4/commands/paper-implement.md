@@ -1,112 +1,114 @@
 ---
 name: paper-implement
-description: Execute exactly one paper-formalization ticket in a fresh context using existing lean4-skills proof engines
+description: Execute exactly one contracted paper-formalization ticket in a fresh context
 user_invocable: true
 argument-hint: '<ticket-id-or-owner/repo#issue>'
 ---
 
 # Lean4 Paper Implement
 
-One invocation owns **one ticket**. This workflow trusts the upstream spec/ticket
-plan and does not reopen it during ordinary implementation.
+One invocation owns **one approved ticket contract**. It does not reopen upstream
+planning during ordinary implementation.
 
-Read [paper-workflow.md](../skills/lean4/references/paper-workflow.md) and the
-existing [cycle-engine.md](../skills/lean4/references/cycle-engine.md).
+Read [paper-workflow.md](../skills/lean4/references/paper-workflow.md) and
+[cycle-engine.md](../skills/lean4/references/cycle-engine.md).
 
 ## Usage
 
-Resolve the supplied ticket to a stable local ticket ID. For a GitHub reference,
-confirm the issue title and its embedded local ticket ID before editing Lean.
-If the reference is ambiguous, stop rather than guessing from a numbered list.
-
-Then:
+Resolve the supplied reference to a stable local ticket ID, then run:
 
 ```bash
 lean4-skills-paper-workflow validate
-lean4-skills-paper-workflow frontier
-lean4-skills-paper-workflow start-ticket T-...
+python3 <plugin-root>/lib/paper_architecture.py validate
+python3 <plugin-root>/lib/paper_architecture.py check-ticket T-042
+python3 <plugin-root>/lib/paper_architecture.py render-dispatch T-042
+lean4-skills-paper-workflow start-ticket T-042
 ```
 
-Do not start if it is not on the frontier. If durable state says `in_progress` but
-the prior session is gone and no handoff was written, inspect the worktree first
-and explicitly recover the orphaned session:
-
-```bash
-lean4-skills-paper-workflow recover-ticket T-... \
-  --reason "previous session terminated before handoff"
-```
-
-Then recompute the frontier; never silently reset an in-progress ticket.
-
-## Reconstruct only relevant context
-
-Read:
-
-- the ticket body/local ticket record;
-- `FORMALIZATION_SPEC.md` sections relevant to the ticket;
-- `.formalization/CONTEXT.md`;
-- mapped paper claim(s), direct mathematical dependencies, registered assumptions;
-- the last handoff if status was `partial`;
-- relevant Lean files/imports.
-
-Do not reread the whole paper unless the ticket explicitly requires broader source
-analysis.
+`check-ticket` is a hard gate. It also requires completed dependency coverage for
+the active Paper Claim closure and rejects any ticket containing even one
+obligation outside the active verification stage.
 
 ## Actions
 
-Use the existing workflow that matches the ticket:
+### Reconstruct the session
 
-- statement/formalization work → `/lean4:formalize` or drafting tools;
-- proof filling → `/lean4:prove` or `/lean4:autoprove`;
-- suspected false statement → `/lean4:disprove`;
-- integration check → `/lean4:checkpoint`/build ladder;
-- review → `/lean4:review` when appropriate.
+Use the generated dispatch JSON as the primary zero-context packet. It contains
+spec fingerprint, claims, obligations, statement locks, ownership, acceptance
+commands, risk, and last handoff. Read only the source/Lean context needed by the
+contract.
 
-Paper workflow does not replace their LSP/search/build/header-fence mechanics.
+### Work the contract
+
+Use the contract-selected worker (`formalize`, `prove`, `autoprove`, `disprove`,
+`integrate`, `review`, or bounded `research`). Research may not discharge a formal
+obligation.
+
+For proof work:
+
+```text
+inspect goal -> search -> edit -> compile/check -> diagnose -> repair -> repeat
+```
+
+Modify only `owned_files`. Treat `read_files` as read-only. Never alter a locked
+paper statement inside an implementation session.
+
+## Completion
+
+When the mathematical work appears finished, run the contract's Lean checks and
+close the base ticket according to the existing workflow. Then let the architecture
+helper independently execute the frozen acceptance commands:
+
+```bash
+python3 <plugin-root>/lib/paper_architecture.py verify-ticket T-042
+```
+
+The helper records command exit codes, stdout/stderr hashes, environment metadata,
+contract fingerprint, and relevant current source hashes. A failed command does
+not produce PASS evidence.
+
+Then satisfy only obligations named by `completes_obligations`:
+
+```bash
+python3 <plugin-root>/lib/paper_architecture.py satisfy-obligation O-ANA-017 \
+  --ticket T-042 \
+  --evidence "contracted estimate completed"
+```
+
+If no valid ticket verification exists, `satisfy-obligation` runs machine
+verification automatically. Free-form `--evidence` is only a note; it cannot
+replace executable evidence. Manual `--command` values may not differ from the
+approved contract commands.
+
+If the relevant source file, evidence file, or contract changes later, validation
+marks the machine evidence stale/invalid until re-verification.
+
+If this closes a Paper Claim, use the existing statement fingerprint, build,
+zero-sorry, axiom, and dependency gate before marking the claim verified.
+
+### Incomplete
+
+Persist a paper handoff and leave the base ticket `partial`. A fresh session can
+render a new dispatch and resume the same contract.
+
+### Too large
+
+Return to planning, create child obligations/tickets, and revise dependencies.
+Do not silently expand ownership or scope.
 
 ## Safety
 
-- Do not change a locked paper statement in a proof session.
-- Do not turn a paper-original claim into an axiom/assumption.
-- Do not silently broaden the ticket to unrelated claims.
-- If a locked statement appears wrong, block the ticket and route the claim to planning or disprove.
+- Never turn a paper-original claim into an assumption.
+- Never accept prose or agent confidence as proof evidence.
+- Never broaden to unrelated obligations.
+- Never use a dummy acceptance command merely to obtain exit code 0.
+- If the target is false/malformed, block and route to planning or disproof.
+- More than two independent hard unknowns is a split signal.
 
-## Completion paths
-
-### Finished
-
-Run the ticket's actual acceptance checks. If this ticket closes a paper claim,
-verify that claim through the evidence gate only after its statement is locked,
-its paper dependencies are verified, build passes, sorry count is zero, and the
-axiom audit passes:
-
-```bash
-lean4-skills-paper-workflow verify-claim P-... \
-  --build passed --sorries 0 --axioms passed \
-  --statement-text /tmp/P-....statement
-lean4-skills-paper-workflow finish-ticket T-... --verification passed
-```
-
-If mapped to GitHub, close it explicitly:
-
-```bash
-lean4-skills-paper-workflow github-close-ticket T-...
-```
-
-### Incomplete but still one coherent task
-
-Persist `/lean4:paper-handoff` before the context boundary and leave the ticket
-`partial`. A fresh session may resume the same ticket.
-
-### Too large / newly discovered independent unknowns
-
-Create child tickets first, then make the parent depend on them with
-`split-ticket`. Do not burn repeated full contexts against an oversized parent.
-
-At the end, show the new frontier; do not automatically start the next ticket in
-the same context.
+After completion, show the new frontier. Do not automatically start another ticket
+inside the same context.
 
 ## See Also
 
-Use `/lean4:paper-handoff` before a context boundary, `/lean4:paper-review` for
-paper-level read-only scrutiny, and the existing theorem workflows for Lean work.
+Use `/lean4:paper-handoff` before context loss, `/lean4:paper-review` for
+architecture scrutiny, and theorem-level workflows for Lean proof mechanics.
