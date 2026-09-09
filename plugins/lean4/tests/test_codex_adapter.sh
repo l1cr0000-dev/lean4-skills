@@ -132,6 +132,11 @@ for skill_name in expected_skills:
     assert f"${skill_name}" in default_prompt
     assert "source-command-" not in skill_text
     assert "source-command-" not in metadata
+    if skill_name == "paper-to-tickets":
+        assert "render-tickets" in skill_text
+        assert "--publish-github" in skill_text
+        assert "github-sync" in skill_text
+        assert "--approved" in skill_text
 for runtime_path in ("commands", "lib", "bin", "hooks"):
     assert not (adapter_root / runtime_path).exists()
 

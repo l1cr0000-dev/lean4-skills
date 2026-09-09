@@ -29,3 +29,13 @@ python3 plugins/lean4/lib/paper_workflow.py render-tickets
 
 The output is `.formalization/generated/tickets/README.md` plus one
 `.md` file per ticket. The JSON state remains authoritative.
+
+## Completion behavior
+
+Always run `render-tickets` after the Ticket DAG or its contracts change; do not
+leave the Markdown projection stale.
+
+If the user explicitly requests `--publish-github`, summarize the planned
+spec/ticket projections and ask for confirmation before writing Issues. After
+confirmation, run `github-sync` with `--approved`; never publish draft tickets
+silently or use `--include-drafts` unless the user explicitly asks for it.
